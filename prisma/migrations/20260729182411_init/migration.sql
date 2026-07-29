@@ -1,0 +1,8 @@
+-- CreateEnum
+CREATE TYPE "Material" AS ENUM ('NORMAL', 'FIRE', 'WATER', 'GRASS', 'METAL', 'CERAMIC', 'GLASS', 'PLASTIC', 'ELECTRIC');
+
+-- CreateEnum
+CREATE TYPE "Shape" AS ENUM ('FREEFORM', 'ROUND', 'TRIANGLE', 'SQUARE', 'LONG');
+
+-- CreateEnum
+CREATE TYPE "Rarity" AS ENUM ('COMMON', 'RARE', 'EPIC');

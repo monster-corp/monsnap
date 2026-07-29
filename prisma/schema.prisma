@@ -11,3 +11,29 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Material {
+  NORMAL
+  FIRE
+  WATER
+  GRASS
+  METAL
+  CERAMIC
+  GLASS
+  PLASTIC
+  ELECTRIC
+}
+
+enum Shape {
+  FREEFORM
+  ROUND
+  TRIANGLE
+  SQUARE
+  LONG
+}
+
+enum Rarity {
+  COMMON
+  RARE
+  EPIC
+}
