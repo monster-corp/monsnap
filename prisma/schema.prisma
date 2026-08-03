@@ -11,3 +11,161 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model User {
+  id        BigInt   @id @default(autoincrement())
+  nickname  String   @db.VarChar(50)
+  anonToken String   @unique @default(dbgenerated("gen_random_uuid()")) @map("anon_token") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scans           Scan[]
+  eggs            Egg[]
+  eggWalkSessions EggWalkSession[]
+  userMonsters    UserMonster[]
+  battleLogs      BattleLog[]
+
+  @@map("users")
+}
+
+model Monster {
+  id          BigInt   @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  rarity      String   @db.VarChar(20)
+  material    String   @db.VarChar(20)
+  shape       String   @db.VarChar(20)
+  dropWeight  Int      @map("drop_weight")
+  baseHp      Int      @map("base_hp")
+  baseAttack  Int      @map("base_attack")
+  baseDefense Int      @map("base_defense")
+  baseSpeed   Int      @map("base_speed")
+  imageUrl    String   @map("image_url")
+  isFallback  Boolean  @default(false) @map("is_fallback")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  eggs         Egg[]
+  userMonsters UserMonster[]
+
+  @@index([material, shape])
+  @@map("monsters")
+}
+
+model RarityStepRequirement {
+  rarity        String   @id @db.VarChar(20)
+  requiredSteps Int      @map("required_steps")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+
+  @@map("rarity_step_requirements")
+}
+
+model Scan {
+  id                  BigInt   @id @default(autoincrement())
+  userId              BigInt   @map("user_id")
+  extractedAttributes Json     @map("extracted_attributes")
+  material            String?  @db.VarChar(20)
+  shape               String?  @db.VarChar(20)
+  similarityScore     Decimal? @map("similarity_score") @db.Decimal(5, 2)
+  isFaceBlocked       Boolean  @default(false) @map("is_face_blocked")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  egg  Egg?
+
+  @@index([userId])
+  @@index([material, shape])
+  @@index([createdAt])
+  @@map("scans")
+}
+
+model Egg {
+  id            BigInt    @id @default(autoincrement())
+  userId        BigInt    @map("user_id")
+  scanId        BigInt    @unique @map("scan_id")
+  monsterId     BigInt    @map("monster_id")
+  requiredSteps Int       @map("required_steps")
+  currentSteps  Int       @default(0) @map("current_steps")
+  status        String    @default("INCUBATING") @db.VarChar(20)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  readyAt       DateTime? @map("ready_at")
+  hatchedAt     DateTime? @map("hatched_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scan            Scan             @relation(fields: [scanId], references: [id])
+  monster         Monster          @relation(fields: [monsterId], references: [id])
+  eggWalkSessions EggWalkSession[]
+  userMonsters    UserMonster[]
+
+  @@index([userId, status])
+  @@map("eggs")
+}
+
+model EggWalkSession {
+  id            BigInt    @id @default(autoincrement())
+  eggId         BigInt    @map("egg_id")
+  userId        BigInt    @map("user_id")
+  startedAt     DateTime  @default(now()) @map("started_at")
+  endedAt       DateTime? @map("ended_at")
+  stepsCaptured Int       @default(0) @map("steps_captured")
+  endReason     String?   @map("end_reason") @db.VarChar(20)
+  status        String    @default("ACTIVE") @db.VarChar(20)
+
+  egg  Egg  @relation(fields: [eggId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eggId])
+  @@map("egg_walk_sessions")
+}
+
+model UserMonster {
+  id            BigInt   @id @default(autoincrement())
+  userId        BigInt   @map("user_id")
+  monsterId     BigInt   @map("monster_id")
+  eggId         BigInt?  @map("egg_id")
+  catchCount    Int      @default(1) @map("catch_count")
+  level         Int      @default(1)
+  firstCaughtAt DateTime @default(now()) @map("first_caught_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monster Monster @relation(fields: [monsterId], references: [id])
+  egg     Egg?    @relation(fields: [eggId], references: [id], onDelete: SetNull)
+
+  battleLogs BattleLog[]
+
+  @@unique([userId, monsterId])
+  @@index([userId])
+  @@map("user_monsters")
+}
+
+model Boss {
+  id              BigInt   @id @default(autoincrement())
+  name            String   @db.VarChar(100)
+  imageUrl        String   @map("image_url")
+  hp              Int
+  weakAttribute   String?  @map("weak_attribute") @db.VarChar(20)
+  strongAttribute String?  @map("strong_attribute") @db.VarChar(20)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  battleLogs BattleLog[]
+
+  @@map("bosses")
+}
+
+model BattleLog {
+  id               BigInt   @id @default(autoincrement())
+  userId           BigInt   @map("user_id")
+  bossId           BigInt   @map("boss_id")
+  userMonsterId    BigInt   @map("user_monster_id")
+  damageMultiplier Decimal  @default(1.0) @map("damage_multiplier") @db.Decimal(4, 2)
+  damageDealt      Int      @map("damage_dealt")
+  isCritical       Boolean  @default(false) @map("is_critical")
+  bossHpRemaining  Int      @map("boss_hp_remaining")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boss        Boss        @relation(fields: [bossId], references: [id])
+  userMonster UserMonster @relation(fields: [userMonsterId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("battle_logs")
+}
