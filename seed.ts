@@ -101,6 +101,7 @@ async function main() {
     { name: '수은 슬라임', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 100, imageUrl: '/images/monsters/mercury_slime.png', isFallback: false },
     { name: '동전', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/coin.png', isFallback: false },
     { name: '장독대', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/pot_of_poison.png', isFallback: false },
+    { name: '뚜껑 무당벌레', rarity: 'COMMON', material: 'PLASTIC', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/plastic_ladybug.png', isFallback: false },
     { name: '유리구슬', rarity: 'COMMON', material: 'GLASS', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/glass_marble.png', isFallback: false },
     { name: '꼬마전구', rarity: 'COMMON', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/lightbulb.png', isFallback: false },
 
@@ -117,6 +118,7 @@ async function main() {
     { name: '달항아리', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 20, imageUrl: '/images/monsters/moon_spirit.png', isFallback: false },
     { name: '삼각자', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 20, imageUrl: '/images/monsters/triangle_ruler.png', isFallback: false },
     { name: '유리공주', rarity: 'EPIC', material: 'GLASS', shape: 'SQUARE', dropWeight: 20, imageUrl: '/images/monsters/glass_princess.png', isFallback: false },
+    { name: '전기 뱀장어', rarity: 'EPIC', material: 'ELECTRIC', shape: 'LONG', dropWeight: 20, imageUrl: '/images/monsters/electric_fish.png', isFallback: false },
 
     // FALLBACK (관상용/피규어 버기)
     { name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 0, imageUrl: '/images/monsters/buggy.png', isFallback: true },
