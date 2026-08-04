@@ -93,6 +93,7 @@ async function main() {
   const rawMonsters = [
     // COMMON (총합 200)
     { name: '누덕이', rarity: 'COMMON', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 100, imageUrl: '/images/monsters/nudeoki.png', isFallback: false },
+    { name: '먼지돌이', rarity: 'COMMON', material: 'NORMAL', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/dust.png', isFallback: false },
     { name: '양말뱀', rarity: 'COMMON', material: 'NORMAL', shape: 'LONG', dropWeight: 100, imageUrl: '/images/monsters/sock_snake.png', isFallback: false },
     { name: '도깨비불', rarity: 'COMMON', material: 'FIRE', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/fire_ghost.png', isFallback: false },
     { name: '얼음도치', rarity: 'COMMON', material: 'WATER', shape: 'TRIANGLE', dropWeight: 100, imageUrl: '/images/monsters/ice_hedgehog.png', isFallback: false },
@@ -100,16 +101,20 @@ async function main() {
     { name: '수은 슬라임', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 100, imageUrl: '/images/monsters/mercury_slime.png', isFallback: false },
     { name: '동전', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/coin.png', isFallback: false },
     { name: '장독대', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/pot_of_poison.png', isFallback: false },
+    { name: '유리구슬', rarity: 'COMMON', material: 'GLASS', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/glass_marble.png', isFallback: false },
     { name: '꼬마전구', rarity: 'COMMON', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 100, imageUrl: '/images/monsters/lightbulb.png', isFallback: false },
 
     // RARE (총합 240)
     { name: '히노보즈', rarity: 'RARE', material: 'FIRE', shape: 'ROUND', dropWeight: 50, imageUrl: '/images/monsters/hinobozu.png', isFallback: false },
     { name: '스이보즈', rarity: 'RARE', material: 'WATER', shape: 'ROUND', dropWeight: 50, imageUrl: '/images/monsters/suibozu.png', isFallback: false },
+    { name: '종이무사', rarity: 'RARE', material: 'PLANT', shape: 'TRIANGLE', dropWeight: 50, imageUrl: '/images/monsters/paper_warrior.png', isFallback: false },
     { name: '새피리', rarity: 'RARE', material: 'CERAMIC', shape: 'FREEFORM', dropWeight: 50, imageUrl: '/images/monsters/bird_whistle.png', isFallback: false },
 
     // EPIC (총합 280)
     { name: '아쿠아냥', rarity: 'EPIC', material: 'WATER', shape: 'ROUND', dropWeight: 20, imageUrl: '/images/monsters/aquanyan.png', isFallback: false },
-    { name: '클리오네', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 20, imageUrl: '/images/monsters/clione.png', isFallback: false }, // 🔧 이미지 경로 수정됨
+    { name: '클리오네', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 20, imageUrl: '/images/monsters/clione.png', isFallback: false },
+    { name: '클로버', rarity: 'EPIC', material: 'PLANT', shape: 'FREEFORM', dropWeight: 20, imageUrl: '/images/monsters/clover.png', isFallback: false },
+    { name: '달항아리', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 20, imageUrl: '/images/monsters/moon_spirit.png', isFallback: false },
     { name: '삼각자', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 20, imageUrl: '/images/monsters/triangle_ruler.png', isFallback: false },
     { name: '유리공주', rarity: 'EPIC', material: 'GLASS', shape: 'SQUARE', dropWeight: 20, imageUrl: '/images/monsters/glass_princess.png', isFallback: false },
 
