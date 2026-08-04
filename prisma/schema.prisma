@@ -64,7 +64,7 @@ model Scan {
   material            String?  @db.VarChar(20)
   shape               String?  @db.VarChar(20)
   similarityScore     Decimal? @map("similarity_score") @db.Decimal(5, 2)
-  isFaceBlocked       Boolean  @default(false) @map("is_face_blocked")
+  blockReason         String   @default("NONE") @map("block_reason") @db.VarChar(20)
   createdAt           DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
