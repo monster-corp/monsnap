@@ -22,6 +22,9 @@ confidence는 0~100 사이의 정수부와 소수점 이하 2자리로 표현하
 export async function callVlm(image: File): Promise<VlmResponse> {
     const base64 = await fileToBase64(image);
 
+    // 모바일 환경에서 타입을 비워둔 상태로 보낼 수 있음
+    const mediaType = image.type || "image/jpeg";
+
     let output: unknown;
     try {
         const result = await withTimeout(
@@ -33,7 +36,7 @@ export async function callVlm(image: File): Promise<VlmResponse> {
                         role: "user",
                         content: [
                             {type: "text", text: VLM_PROMPT},
-                            {type: "image", image: base64},
+                            {type: "file", mediaType, data: base64},
                         ],
                     },
                 ],
@@ -48,6 +51,7 @@ export async function callVlm(image: File): Promise<VlmResponse> {
         if (NoOutputGeneratedError.isInstance(err)) {
             throw new VlmResponseInvalidError(err);
         }
+        console.error("[callVlm] VLM 호출 실패:", err);
         throw new VlmCallError(err);
     }
 
