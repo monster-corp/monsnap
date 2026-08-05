@@ -5,17 +5,16 @@ import {BLOCK_REASON_TO_ERROR} from "@/lib/schemas/vlm";
 import {prisma} from "@/lib/prisma";
 import {matchMonster} from "@/lib/matching";
 import {createEggFromScan} from "@/lib/eggs";
+import {getCurrentUserId} from "@/lib/auth";
 
 export const maxDuration = 60;
 
-/*
-    TODO(#3): 인증 방식(쿠키/헤더) 확정되면 lib/auth.ts의 getUserIdFromSession으로 교체. 지금은 단일 테스트 유저로 고정.
-*/
-const TEMP_USER_ID = BigInt(1);
-
 export async function POST(request: NextRequest) {
     try {
-        const userId = TEMP_USER_ID;
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            return respondWithStatus("UNAUTHORIZED");
+        }
 
         const formData = await request.formData();
         const image = formData.get("image");
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
             return respondWithStatus(err.key, null, err.message);
         }
 
-        console.error("[/api/scan] unexpected error:", err);
+        console.error("[/api/scans] unexpected error:", err);
         return respondWithStatus("INTERNAL_ERROR");
     }
 }
