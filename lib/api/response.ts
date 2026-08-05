@@ -8,6 +8,8 @@ export const ERROR = {
 
     // 400
     IMAGE_REQUIRED: {code: 40000, message: "이미지가 필요합니다"},
+    INVALID_NICKNAME: {code: 40001, message: "닉네임은 2~12자의 한글/영문/숫자만 가능합니다"},
+    INVALID_REQUEST: { code: 40002, message: "요청 형식이 올바르지 않습니다" },
 
     // 401
     UNAUTHORIZED: {code: 40100, message: "세션이 유효하지 않습니다"},
