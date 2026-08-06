@@ -5,7 +5,7 @@ const MATERIAL_STATS: Record<string, { hp: number; atk: number; def: number; spd
   NORMAL:   { hp: 0.00,  atk: 0.00,  def: 0.00,  spd: 0.00 },
   FIRE:     { hp: -0.15, atk: 0.20,  def: -0.20, spd: 0.15 },
   WATER:    { hp: 0.20,  atk: -0.15, def: 0.10,  spd: -0.15 },
-  PLANT:    { hp: 0.20,  atk: -0.20, def: 0.10,  spd: -0.10 },
+  GRASS:    { hp: 0.20,  atk: -0.20, def: 0.10,  spd: -0.10 },
   METAL:    { hp: 0.00,  atk: 0.10,  def: 0.15,  spd: -0.25 },
   CERAMIC:  { hp: -0.15, atk: -0.15, def: 0.25,  spd: 0.05 },
   PLASTIC:  { hp: -0.10, atk: 0.05,  def: -0.15, spd: 0.20 },
@@ -99,7 +99,7 @@ async function main() {
     { name: '소키', rarity: 'COMMON', material: 'NORMAL', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/소키.png`, isFallback: false },
     { name: '플레미', rarity: 'COMMON', material: 'FIRE', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/플레미.png`, isFallback: false },
     { name: '얼음도치', rarity: 'COMMON', material: 'WATER', shape: 'TRIANGLE', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/얼음도치.png`, isFallback: false },
-    { name: '북러버', rarity: 'COMMON', material: 'PLANT', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/북러버.png`, isFallback: false },
+    { name: '북러버', rarity: 'COMMON', material: 'GRASS', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/북러버.png`, isFallback: false },
     { name: '아르젠', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/아르젠.png`, isFallback: false },
     { name: '페니', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/페니.png`, isFallback: false },
     { name: '독지기', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/독지기.png`, isFallback: false },
@@ -111,7 +111,7 @@ async function main() {
     { name: '크래키', rarity: 'RARE', material: 'NORMAL', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/크래키.png`, isFallback: false },
     { name: '히노보즈', rarity: 'RARE', material: 'FIRE', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/히노보즈.png`, isFallback: false },
     { name: '스이보즈', rarity: 'RARE', material: 'WATER', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/스이보즈.png`, isFallback: false },
-    { name: '오리가미', rarity: 'RARE', material: 'PLANT', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/오리가미.png`, isFallback: false },
+    { name: '오리가미', rarity: 'RARE', material: 'GRASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/오리가미.png`, isFallback: false },
     { name: '아마다스', rarity: 'RARE', material: 'METAL', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/아마다스.png`, isFallback: false },
     { name: '비색조', rarity: 'RARE', material: 'CERAMIC', shape: 'FREEFORM', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/비색조.png`, isFallback: false },
     { name: '블록킹', rarity: 'RARE', material: 'PLASTIC', shape: 'SQUARE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/블록킹.png`, isFallback: false },
@@ -123,7 +123,7 @@ async function main() {
     { name: '화령조', rarity: 'EPIC', material: 'FIRE', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/화령조.png`, isFallback: false },
     { name: '아쿠아냥', rarity: 'EPIC', material: 'WATER', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아냥.png`, isFallback: false },
     { name: '아쿠아엘', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아엘.png`, isFallback: false },
-    { name: '클로버드', rarity: 'EPIC', material: 'PLANT', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/클로버드.png`, isFallback: false },
+    { name: '클로버드', rarity: 'EPIC', material: 'GRASS', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/클로버드.png`, isFallback: false },
     { name: '메탈리퍼', rarity: 'EPIC', material: 'METAL', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/메탈리퍼.png`, isFallback: false },
     { name: '월영', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/월영.png`, isFallback: false },
     { name: '트라플라', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/트라플라.png`, isFallback: false },
@@ -131,7 +131,7 @@ async function main() {
     { name: '볼트라돈', rarity: 'EPIC', material: 'ELECTRIC', shape: 'LONG', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/볼트라돈.png`, isFallback: false },
 
     // FALLBACK (관상용/피규어 버기)
-    { name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 0, imageUrl: `${STORAGE_BASE_URL}/버기.png`, isFallback: true },
+    { name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 1, imageUrl: `${STORAGE_BASE_URL}/버기.png`, isFallback: true },
   ];
 
   // 4. 스탯 자동 연산 후 DB 생성
