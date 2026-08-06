@@ -1,5 +1,6 @@
 import {prisma} from "@/lib/prisma";
 import {EggSlotFullError} from "@/lib/errors/eggs";
+import {EggStatus} from "@/lib/status";
 import type {Monster, Egg} from "@/app/generated/prisma/client";
 
 const MAX_ACTIVE_EGGS = 3;
@@ -13,7 +14,7 @@ export async function createEggFromScan(
         const activeCount = await tx.egg.count({
             where: {
                 userId,
-                status: {not: "HATCHED"},
+                status: {not: EggStatus.HATCHED},
             },
         });
 

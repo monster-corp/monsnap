@@ -15,8 +15,19 @@ export const ERROR = {
     // 401
     UNAUTHORIZED: {code: 40100, message: "세션이 유효하지 않습니다"},
 
+    // 404
+    EGG_NOT_FOUND: {code: 40400, message: "해당 알을 찾을 수 없습니다"},
+    WALK_SESSION_NOT_FOUND: {code: 40401, message: "해당 워크 세션을 찾을 수 없습니다"},
+
     // 409
     EGG_SLOT_FULL: {code: 40900, message: "알 보관함이 가득 찼습니다"},
+    EGG_NOT_WALKABLE: {code: 40904, message: "걷기가 가능한 상태의 알이 아닙니다"},
+    SESSION_ALREADY_ACTIVE: {code: 40901, message: "이미 진행 중인 워크 세션이 있습니다"},
+    SESSION_NOT_ACTIVE: {code: 40902, message: "진행 중인 워크 세션이 아닙니다"},
+    STEP_COUNT_REGRESSED: {code: 40903, message: "이전보다 작은 누적 걸음 수는 전송할 수 없습니다"},
+
+    // 422
+    INVALID_STEP_COUNT: {code: 42200, message: "걸음 수 형식이 올바르지 않습니다"},
 
     // 500
     INTERNAL_ERROR: {code: 50000, message: "일시적인 오류가 발생했습니다"},
