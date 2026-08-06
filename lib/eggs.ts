@@ -102,3 +102,20 @@ export async function hatchEgg(userId: bigint, eggId: bigint): Promise<HatchEggR
         };
     });
 }
+
+export function getUserEggs(userId: bigint) {
+    return prisma.egg.findMany({
+        where: {userId, status: {not: EggStatus.HATCHED}},
+        select: {
+            id: true,
+            status: true,
+            currentSteps: true,
+            requiredSteps: true,
+            eggWalkSessions: {
+                where: {status: WalkSessionStatus.ACTIVE},
+                select: {id: true},
+            },
+        },
+        orderBy: {createdAt: "asc"},
+    });
+}
