@@ -6,8 +6,11 @@ import {prisma} from "@/lib/prisma";
 import {matchMonster} from "@/lib/matching";
 import {createEggFromScan} from "@/lib/eggs";
 import {getCurrentUserId} from "@/lib/auth";
+import {isAllowedImageType} from "@/lib/image";
 
 export const maxDuration = 60;
+
+const IMAGE_FIELD = "image";
 
 export async function POST(request: NextRequest) {
     try {
@@ -16,10 +19,19 @@ export async function POST(request: NextRequest) {
             return respondWithStatus("UNAUTHORIZED");
         }
 
+        const contentType = request.headers.get("content-type");
+        if (!contentType?.startsWith("multipart/form-data")) {
+            return respondWithStatus("INVALID_REQUEST");
+        }
+
         const formData = await request.formData();
-        const image = formData.get("image");
-        if (!(image instanceof File)) {
+        const image = formData.get(IMAGE_FIELD);
+        if (!(image instanceof File) || image.size === 0) {
             return respondWithStatus("IMAGE_REQUIRED");
+        }
+
+        if (!isAllowedImageType(image.type)) {
+            return respondWithStatus("INVALID_IMAGE");
         }
 
         const vlmResult = await callVlm(image);
