@@ -1,6 +1,6 @@
 import {prisma} from "@/lib/prisma";
-import {Prisma} from "@/app/generated/prisma/client";
 import type {Egg, EggWalkSession} from "@/app/generated/prisma/client";
+import {Prisma} from "@/app/generated/prisma/client";
 import {
     EggNotFoundError,
     EggNotWalkableError,
@@ -9,7 +9,7 @@ import {
     StepCountRegressedError,
     WalkSessionNotFoundError,
 } from "@/lib/errors/walk-session";
-import {EggStatus, WalkSessionStatus, WalkSessionEndReasonType,} from "@/lib/status";
+import {EggStatus, WalkSessionEndReason, WalkSessionEndReasonType, WalkSessionStatus,} from "@/lib/status";
 
 export async function createWalkSession(
     userId: bigint,
@@ -129,12 +129,12 @@ export async function endWalkSession(
     userId: bigint,
     eggId: bigint,
     sessionId: bigint,
-    endReason: WalkSessionEndReasonType
+    fallbackEndReason: WalkSessionEndReasonType
 ): Promise<EggWalkSession> {
     return prisma.$transaction(async (tx) => {
         const session = await tx.eggWalkSession.findFirst({
             where: {id: sessionId, eggId, userId},
-            select: {id: true, status: true},
+            include: {egg: {select: {status: true}}},
         });
         if (!session) {
             throw new WalkSessionNotFoundError();
@@ -142,6 +142,14 @@ export async function endWalkSession(
         if (session.status !== WalkSessionStatus.ACTIVE) {
             throw new SessionNotActiveError();
         }
+
+        // egg가 이미 READY라면 호출자가 전달한 사유와 관계없이
+        // 실제 종료 사유는 '걸음 목표 달성'으로 기록한다.
+        // fallbackEndReason은 READY가 아닌 경우(사용자 종료, 백그라운드, 타임아웃 등)에만 사용된다.
+        const endReason =
+            session.egg.status === EggStatus.READY
+                ? WalkSessionEndReason.STEP_GOAL_REACHED
+                : fallbackEndReason;
 
         return tx.eggWalkSession.update({
             where: {id: sessionId},
