@@ -77,9 +77,9 @@ async function main() {
 
   // 2. 걸음 수 요구사항 생성
   const rarityStepRequirements = [
-    { rarity: 'COMMON', requiredSteps: 1000 },
-    { rarity: 'RARE', requiredSteps: 5000 },
-    { rarity: 'EPIC', requiredSteps: 10000 },
+    { rarity: 'COMMON', requiredSteps: 10 },
+    { rarity: 'RARE', requiredSteps: 30 },
+    { rarity: 'EPIC', requiredSteps: 50 },
   ];
 
   for (const req of rarityStepRequirements) {
@@ -89,47 +89,49 @@ async function main() {
   }
   console.log('✅ RarityStepRequirement 생성 완료');
 
+  const STORAGE_BASE_URL = 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com';
+
   // 3. Raw 몬스터 목록 데이터
   const rawMonsters = [
     // COMMON (총합 200)
-    { name: '누덕이', rarity: 'COMMON', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%88%84%EB%8D%95%EC%9D%B4.png', isFallback: false },
-    { name: '먼지돌이', rarity: 'COMMON', material: 'NORMAL', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%A8%BC%EC%A7%80%EB%8F%8C%EC%9D%B4.png', isFallback: false },
-    { name: '소키', rarity: 'COMMON', material: 'NORMAL', shape: 'LONG', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%86%8C%ED%82%A4.png', isFallback: false },
-    { name: '플레미', rarity: 'COMMON', material: 'FIRE', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%94%8C%EB%A0%88%EB%AF%B8.png', isFallback: false },
-    { name: '얼음도치', rarity: 'COMMON', material: 'WATER', shape: 'TRIANGLE', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%96%BC%EC%9D%8C%EB%8F%84%EC%B9%98.png', isFallback: false },
-    { name: '북러버', rarity: 'COMMON', material: 'PLANT', shape: 'LONG', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%B6%81%EB%9F%AC%EB%B2%84.png', isFallback: false },
-    { name: '아르젠', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%95%84%EB%A5%B4%EC%A0%A0.png', isFallback: false },
-    { name: '페니', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%8E%98%EB%8B%88.png', isFallback: false },
-    { name: '독지기', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%8F%85%EC%A7%80%EA%B8%B0.png', isFallback: false },
-    { name: '캡버그', rarity: 'COMMON', material: 'PLASTIC', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%BA%A1%EB%B2%84%EA%B7%B8.png', isFallback: false },
-    { name: '글래시스', rarity: 'COMMON', material: 'GLASS', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EA%B8%80%EB%9E%98%EC%8B%9C%EC%8A%A4.png', isFallback: false },
-    { name: '전구리', rarity: 'COMMON', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 70, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%A0%84%EA%B5%AC%EB%A6%AC.png', isFallback: false },
+    { name: '누덕이', rarity: 'COMMON', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/누덕이.png`, isFallback: false },
+    { name: '먼지돌이', rarity: 'COMMON', material: 'NORMAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/먼지돌이.png`, isFallback: false },
+    { name: '소키', rarity: 'COMMON', material: 'NORMAL', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/소키.png`, isFallback: false },
+    { name: '플레미', rarity: 'COMMON', material: 'FIRE', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/플레미.png`, isFallback: false },
+    { name: '얼음도치', rarity: 'COMMON', material: 'WATER', shape: 'TRIANGLE', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/얼음도치.png`, isFallback: false },
+    { name: '북러버', rarity: 'COMMON', material: 'PLANT', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/북러버.png`, isFallback: false },
+    { name: '아르젠', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/아르젠.png`, isFallback: false },
+    { name: '페니', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/페니.png`, isFallback: false },
+    { name: '독지기', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/독지기.png`, isFallback: false },
+    { name: '캡버그', rarity: 'COMMON', material: 'PLASTIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/캡버그.png`, isFallback: false },
+    { name: '글래시스', rarity: 'COMMON', material: 'GLASS', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/글래시스.png`, isFallback: false },
+    { name: '전구리', rarity: 'COMMON', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/전구리.png`, isFallback: false },
 
     // RARE (총합 240)
-    { name: '크래키', rarity: 'RARE', material: 'NORMAL', shape: 'TRIANGLE', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%81%AC%EB%9E%98%ED%82%A4.png', isFallback: false },
-    { name: '히노보즈', rarity: 'RARE', material: 'FIRE', shape: 'ROUND', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%9E%88%EB%85%B8%EB%B3%B4%EC%A6%88.png', isFallback: false },
-    { name: '스이보즈', rarity: 'RARE', material: 'WATER', shape: 'ROUND', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%8A%A4%EC%9D%B4%EB%B3%B4%EC%A6%88.png', isFallback: false },
-    { name: '오리가미', rarity: 'RARE', material: 'PLANT', shape: 'TRIANGLE', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%98%A4%EB%A6%AC%EA%B0%80%EB%AF%B8.png', isFallback: false },
-    { name: '아마다스', rarity: 'RARE', material: 'METAL', shape: 'ROUND', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%95%84%EB%A7%88%EB%8B%A4%EC%8A%A4.png', isFallback: false },
-    { name: '비색조', rarity: 'RARE', material: 'CERAMIC', shape: 'FREEFORM', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%B9%84%EC%83%89%EC%A1%B0.png', isFallback: false },
-    { name: '블록킹', rarity: 'RARE', material: 'PLASTIC', shape: 'SQUARE', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%B8%94%EB%A1%9D%ED%82%B9.png', isFallback: false },
-    { name: '영경검', rarity: 'RARE', material: 'GLASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%98%81%EA%B2%BD%EA%B2%80.png', isFallback: false },
-    { name: '무드덕', rarity: 'RARE', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 25, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%AC%B4%EB%93%9C%EB%8D%95.png', isFallback: false },
+    { name: '크래키', rarity: 'RARE', material: 'NORMAL', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/크래키.png`, isFallback: false },
+    { name: '히노보즈', rarity: 'RARE', material: 'FIRE', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/히노보즈.png`, isFallback: false },
+    { name: '스이보즈', rarity: 'RARE', material: 'WATER', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/스이보즈.png`, isFallback: false },
+    { name: '오리가미', rarity: 'RARE', material: 'PLANT', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/오리가미.png`, isFallback: false },
+    { name: '아마다스', rarity: 'RARE', material: 'METAL', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/아마다스.png`, isFallback: false },
+    { name: '비색조', rarity: 'RARE', material: 'CERAMIC', shape: 'FREEFORM', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/비색조.png`, isFallback: false },
+    { name: '블록킹', rarity: 'RARE', material: 'PLASTIC', shape: 'SQUARE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/블록킹.png`, isFallback: false },
+    { name: '영경검', rarity: 'RARE', material: 'GLASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/영경검.png`, isFallback: false },
+    { name: '무드덕', rarity: 'RARE', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/무드덕.png`, isFallback: false },
 
     // EPIC (총합 280)
-    { name: '파라카스', rarity: 'EPIC', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%8C%8C%EB%9D%BC%EC%B9%B4%EC%8A%A4.png', isFallback: false },
-    { name: '화령조', rarity: 'EPIC', material: 'FIRE', shape: 'FREEFORM', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%99%94%EB%A0%B9%EC%A1%B0.png', isFallback: false },
-    { name: '아쿠아냥', rarity: 'EPIC', material: 'WATER', shape: 'ROUND', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%95%84%EC%BF%A0%EC%95%84%EB%83%A5.png', isFallback: false },
-    { name: '아쿠아엘', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%95%84%EC%BF%A0%EC%95%84%EC%97%98.png', isFallback: false },
-    { name: '클로버드', rarity: 'EPIC', material: 'PLANT', shape: 'FREEFORM', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%81%B4%EB%A1%9C%EB%B2%84%EB%93%9C.png', isFallback: false },
-    { name: '메탈리퍼', rarity: 'EPIC', material: 'METAL', shape: 'TRIANGLE', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%A9%94%ED%83%88%EB%A6%AC%ED%8D%BC.png', isFallback: false },
-    { name: '월영', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EC%9B%94%EC%98%81.png', isFallback: false },
-    { name: '트라플라', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%8A%B8%EB%9D%BC%ED%94%8C%EB%9D%BC.png', isFallback: false },
-    { name: '프리즘퀸', rarity: 'EPIC', material: 'GLASS', shape: 'SQUARE', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%94%84%EB%A6%AC%EC%A6%98%ED%80%B8.png', isFallback: false },
-    { name: '볼트라돈', rarity: 'EPIC', material: 'ELECTRIC', shape: 'LONG', dropWeight: 5, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%B3%BC%ED%8A%B8%EB%9D%BC%EB%8F%88.png', isFallback: false },
+    { name: '파라카스', rarity: 'EPIC', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/파라카스.png`, isFallback: false },
+    { name: '화령조', rarity: 'EPIC', material: 'FIRE', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/화령조.png`, isFallback: false },
+    { name: '아쿠아냥', rarity: 'EPIC', material: 'WATER', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아냥.png`, isFallback: false },
+    { name: '아쿠아엘', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아엘.png`, isFallback: false },
+    { name: '클로버드', rarity: 'EPIC', material: 'PLANT', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/클로버드.png`, isFallback: false },
+    { name: '메탈리퍼', rarity: 'EPIC', material: 'METAL', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/메탈리퍼.png`, isFallback: false },
+    { name: '월영', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/월영.png`, isFallback: false },
+    { name: '트라플라', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/트라플라.png`, isFallback: false },
+    { name: '프리즘퀸', rarity: 'EPIC', material: 'GLASS', shape: 'SQUARE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/프리즘퀸.png`, isFallback: false },
+    { name: '볼트라돈', rarity: 'EPIC', material: 'ELECTRIC', shape: 'LONG', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/볼트라돈.png`, isFallback: false },
 
     // FALLBACK (관상용/피규어 버기)
-    { name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 0, imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%EB%B2%84%EA%B8%B0.png', isFallback: true },
+    { name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 0, imageUrl: `${STORAGE_BASE_URL}/버기.png`, isFallback: true },
   ];
 
   // 4. 스탯 자동 연산 후 DB 생성
@@ -150,7 +152,7 @@ async function main() {
   await prisma.boss.create({
     data: {
       name: '파리지옥',
-      imageUrl: 'https://2xxbahx4rrugreh6.public.blob.vercel-storage.com/%ED%8C%8C%EB%A6%AC%EC%A7%80%EC%98%A5.png',
+      imageUrl: `${STORAGE_BASE_URL}/파리지옥.png`,
       hp: 2000,
       weakAttribute: 'FIRE',
       strongAttribute: 'WATER',
