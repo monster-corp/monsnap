@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
                 material: isBlocked ? null : material,
                 shape: isBlocked ? null : shape,
                 similarityScore: confidence,
-                blockReason: block_reason ?? null,
+                blockReason: block_reason,
             },
         });
 
