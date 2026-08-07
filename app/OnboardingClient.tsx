@@ -8,7 +8,7 @@ import { Noto_Sans_KR } from 'next/font/google';
 const notoSans = Noto_Sans_KR({ subsets: ['latin'], weight: ['400', '500', '700', '900'] });
 
 // TODO: "게임 내 기본 화면"이 확정되면 이 경로만 수정하면 됩니다
-const HOME_PATH = '/scan';
+const HOME_PATH = '/scans';
 
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]*$/;
 const isValidNickname = (name: string) => name.length >= 2 && name.length <= 12 && NICKNAME_REGEX.test(name);
