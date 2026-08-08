@@ -49,8 +49,8 @@ function MonsterSilhouette({ className = '' }: { className?: string }) {
  * 촬영(또는 선택)한 이미지를 서버로 보내기 전에 축소한다.
  *
  * - 폰으로 찍은 사진은 수 MB에 달해 전송과 분석이 느려지고, VLM 타임아웃(15초)에 걸릴 위험이 있다
- * - 결과를 항상 JPEG로 만들기 때문에, 모바일에서 파일 타입이 비어 오는 경우
- *   (lib/vlm.ts 참고)에도 서버의 MIME Type 검사를 통과할 수 있다
+ * - 파일 타입이 비어 오는 경우(lib/vlm.ts 참고)에도 서버의 MIME Type 검사를 통과하도록,
+ *   축소 여부와 관계없이 타입을 보정한다
  * - 축소에 실패하더라도 전송 자체는 원본으로 진행한다
  *
  * 이미지는 속성 판정에만 쓰이고 서버에 저장되지 않는다 (Zero-Storage)
@@ -61,10 +61,14 @@ async function resizeImage(file: File): Promise<File> {
     const { width, height } = bitmap;
     const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(width, height));
 
-    // 이미 충분히 작으면 그대로 사용
+    // 크기가 충분히 작으면 다시 그릴 필요가 없다.
+    // 다만 파일 타입이 비어 있는 경우가 있어, 그때는 내용은 그대로 두고 타입만 보정한다
     if (scale >= 1) {
       bitmap.close();
-      return file;
+      const hasValidType =
+        file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
+      if (hasValidType) return file;
+      return new File([file], file.name, { type: 'image/jpeg' });
     }
 
     const canvas = document.createElement('canvas');

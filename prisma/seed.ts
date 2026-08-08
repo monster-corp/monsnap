@@ -84,7 +84,7 @@ async function main() {
 
   for (const req of rarityStepRequirements) {
     await prisma.rarityStepRequirement.create({
-      data: req as any,
+      data: req,
     });
   }
   console.log('✅ RarityStepRequirement 생성 완료');
@@ -143,7 +143,7 @@ async function main() {
       data: {
         ...monster,
         ...computedStats,
-      } as any,
+      },
     });
   }
   console.log(`✅ 몬스터 ${rawMonsters.length}종 연산 및 저장 완료`);
@@ -157,7 +157,7 @@ async function main() {
       weakAttribute: 'FIRE',
       strongAttribute: 'WATER',
       isActive: true,
-    } as any,
+    },
   });
   console.log('✅ 보스(파리지옥 - 풀 타입 상성) 데이터 생성 완료');
 
