@@ -306,7 +306,7 @@ export default function ScanPage() {
                 미션 하러 가기
               </button>
               <button
-                onClick={() => router.push('/collection')}
+                onClick={() => router.push('/collections')}
                 className="w-full py-4 rounded-full bg-white text-[#3E7A5C] font-bold text-sm border border-[#DCE8DE] active:scale-95 transition-transform"
               >
                 도감으로 이동하기
