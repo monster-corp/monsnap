@@ -10,6 +10,11 @@ const VLM_PROMPT = `
 
 material은 다음 중 하나여야 한다: NORMAL, FIRE, WATER, GRASS, METAL, CERAMIC, GLASS, PLASTIC, ELECTRIC
 shape는 다음 중 하나여야 한다: FREEFORM, ROUND, TRIANGLE, SQUARE, LONG
+1. ROUND: 가로세로 비율이 1:1에 가깝고 모서리가 둥근 형태 (공, 병뚜껑, 원반 등)
+2. SQUARE: 가로세로 비율이 1:1에 가깝고 모서리가 각진 형태 (상자, 큐브, 책 등)
+3. TRIANGLE: 삼각형에 가까운 뾰족한 형태 (피라미드, 원뿔, 삼각자 등)
+4. LONG: 가로세로 비율이 2:1 이상으로, 한쪽 축이 뚜렷하게 긴 막대형. 휘어있어도 전체 윤곽이 길쭉하면 해당 (연필, 빨대, 케이블 등)
+5. FREEFORM: 위 네 가지 중 어디에도 뚜렷하게 속하지 않는 불규칙한 형태
 
 재질이 여러 개 섞여 있으면 가장 넓은 면적을 차지하는 재질 하나를 선택해라.
 confidence는 0~100 사이의 정수부와 소수점 이하 2자리로 표현하여 판단에 대한 확신도를 나타낸다.
@@ -24,6 +29,7 @@ export async function callVlm(image: File): Promise<VlmResponse> {
 
     // 모바일 환경에서 타입을 비워둔 상태로 보낼 수 있음
     const mediaType = image.type || "image/jpeg";
+    const started = performance.now();
 
     let output: unknown;
     try {
@@ -45,6 +51,7 @@ export async function callVlm(image: File): Promise<VlmResponse> {
         );
         output = result.output;
     } catch (err) {
+        console.info(`[callVlm] 실패, ${(performance.now() - started).toFixed(0)}ms 경과`);
         if (err instanceof TimeoutError) {
             throw new VlmTimeoutError();
         }
@@ -53,6 +60,8 @@ export async function callVlm(image: File): Promise<VlmResponse> {
         }
         console.error("[callVlm] VLM 호출 실패:", err);
         throw new VlmCallError(err);
+    } finally {
+        console.info(`[callVlm] ${(performance.now() - started).toFixed(0)}ms`);
     }
 
     // AI SDK의 구조화 출력 이후에도 방어적으로 Zod 검증을 한 번 더 수행

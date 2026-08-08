@@ -119,3 +119,12 @@ export function getUserEggs(userId: bigint) {
         orderBy: {createdAt: "asc"},
     });
 }
+
+export async function assertEggSlotAvailable(userId: bigint): Promise<void> {
+    const activeCount = await prisma.egg.count({
+        where: {userId, status: {not: EggStatus.HATCHED}},
+    });
+    if (activeCount >= MAX_ACTIVE_EGGS) {
+        throw new EggSlotFullError();
+    }
+}
