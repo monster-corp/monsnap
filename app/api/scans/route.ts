@@ -4,7 +4,7 @@ import {callVlm} from "@/lib/vlm";
 import {BLOCK_REASON_TO_ERROR} from "@/lib/schemas/vlm";
 import {prisma} from "@/lib/prisma";
 import {matchMonster} from "@/lib/matching";
-import {createEggFromScan} from "@/lib/eggs";
+import {assertEggSlotAvailable, createEggFromScan} from "@/lib/eggs";
 import {getCurrentUserId} from "@/lib/auth";
 import {isAllowedImageType} from "@/lib/image";
 
@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
         if (!isAllowedImageType(image.type)) {
             return respondWithStatus("INVALID_IMAGE");
         }
+
+        await assertEggSlotAvailable(userId);
 
         const vlmResult = await callVlm(image);
 
