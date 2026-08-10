@@ -19,8 +19,8 @@ export async function matchMonster({material, shape, confidence}: MatchInput): P
         FROM monsters
         WHERE material = ${material}
           AND shape = ${shape}
-        ORDER BY -ln(random()) / drop_weight
-        LIMIT 1;
+          AND is_fallback = false
+        ORDER BY -ln(random()) / drop_weight LIMIT 1;
     `
 
     if (candidates.length === 0) {
