@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
             userMonsters: userMonsters.map((um) => ({
                 userMonsterId: um.id.toString(),
                 monsterId: um.monsterId.toString(),
+                dexId: um.monster.dexId,
                 name: um.monster.name,
                 rarity: um.monster.rarity,
                 material: um.monster.material,
