@@ -29,6 +29,7 @@ model User {
 
 model Monster {
   id          BigInt   @id @default(autoincrement())
+  dexId       Int      @unique @map("dex_id")
   name        String   @db.VarChar(100)
   rarity      String   @db.VarChar(20)
   material    String   @db.VarChar(20)
@@ -122,6 +123,10 @@ model UserMonster {
   eggId         BigInt?  @map("egg_id")
   catchCount    Int      @default(1) @map("catch_count")
   level         Int      @default(1)
+  ivHp          Int      @default(0) @map("iv_hp")
+  ivAttack      Int      @default(0) @map("iv_attack")
+  ivDefense     Int      @default(0) @map("iv_defense")
+  ivSpeed       Int      @default(0) @map("iv_speed")
   firstCaughtAt DateTime @default(now()) @map("first_caught_at")
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -137,6 +142,7 @@ model UserMonster {
 
 model Boss {
   id              BigInt   @id @default(autoincrement())
+  dexId           Int      @unique @map("dex_id")
   name            String   @db.VarChar(100)
   imageUrl        String   @map("image_url")
   hp              Int

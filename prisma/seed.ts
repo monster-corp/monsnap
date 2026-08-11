@@ -94,44 +94,44 @@ async function main() {
   // 3. Raw 몬스터 목록 데이터
   const rawMonsters = [
     // COMMON (총합 200)
-    { name: '누덕이', rarity: 'COMMON', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/누덕이.png`, isFallback: false },
-    { name: '먼지돌이', rarity: 'COMMON', material: 'NORMAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/먼지돌이.png`, isFallback: false },
-    { name: '소키', rarity: 'COMMON', material: 'NORMAL', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/소키.png`, isFallback: false },
-    { name: '플레미', rarity: 'COMMON', material: 'FIRE', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/플레미.png`, isFallback: false },
-    { name: '얼음도치', rarity: 'COMMON', material: 'WATER', shape: 'TRIANGLE', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/얼음도치.png`, isFallback: false },
-    { name: '북러버', rarity: 'COMMON', material: 'GRASS', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/북러버.png`, isFallback: false },
-    { name: '아르젠', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/아르젠.png`, isFallback: false },
-    { name: '페니', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/페니.png`, isFallback: false },
-    { name: '독지기', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/독지기.png`, isFallback: false },
-    { name: '캡버그', rarity: 'COMMON', material: 'PLASTIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/캡버그.png`, isFallback: false },
-    { name: '글래시스', rarity: 'COMMON', material: 'GLASS', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/글래시스.png`, isFallback: false },
-    { name: '전구리', rarity: 'COMMON', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/전구리.png`, isFallback: false },
+    { dexId: 1,  name: '누덕이', rarity: 'COMMON', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/누덕이.png`, isFallback: false },
+    { dexId: 2,  name: '먼지돌이', rarity: 'COMMON', material: 'NORMAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/먼지돌이.png`, isFallback: false },
+    { dexId: 3,  name: '소키', rarity: 'COMMON', material: 'NORMAL', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/소키.png`, isFallback: false },
+    { dexId: 4,  name: '플레미', rarity: 'COMMON', material: 'FIRE', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/플레미.png`, isFallback: false },
+    { dexId: 5,  name: '얼음도치', rarity: 'COMMON', material: 'WATER', shape: 'TRIANGLE', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/얼음도치.png`, isFallback: false },
+    { dexId: 6,  name: '북러버', rarity: 'COMMON', material: 'GRASS', shape: 'LONG', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/북러버.png`, isFallback: false },
+    { dexId: 7,  name: '아르젠', rarity: 'COMMON', material: 'METAL', shape: 'FREEFORM', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/아르젠.png`, isFallback: false },
+    { dexId: 8,  name: '페니', rarity: 'COMMON', material: 'METAL', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/페니.png`, isFallback: false },
+    { dexId: 9,  name: '독지기', rarity: 'COMMON', material: 'CERAMIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/독지기.png`, isFallback: false },
+    { dexId: 10, name: '캡버그', rarity: 'COMMON', material: 'PLASTIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/캡버그.png`, isFallback: false },
+    { dexId: 11, name: '글래시스', rarity: 'COMMON', material: 'GLASS', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/글래시스.png`, isFallback: false },
+    { dexId: 12, name: '전구리', rarity: 'COMMON', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 70, imageUrl: `${STORAGE_BASE_URL}/전구리.png`, isFallback: false },
 
     // RARE (총합 240)
-    { name: '크래키', rarity: 'RARE', material: 'NORMAL', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/크래키.png`, isFallback: false },
-    { name: '히노보즈', rarity: 'RARE', material: 'FIRE', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/히노보즈.png`, isFallback: false },
-    { name: '스이보즈', rarity: 'RARE', material: 'WATER', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/스이보즈.png`, isFallback: false },
-    { name: '오리가미', rarity: 'RARE', material: 'GRASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/오리가미.png`, isFallback: false },
-    { name: '아마다스', rarity: 'RARE', material: 'METAL', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/아마다스.png`, isFallback: false },
-    { name: '비색조', rarity: 'RARE', material: 'CERAMIC', shape: 'FREEFORM', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/비색조.png`, isFallback: false },
-    { name: '블록킹', rarity: 'RARE', material: 'PLASTIC', shape: 'SQUARE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/블록킹.png`, isFallback: false },
-    { name: '영경검', rarity: 'RARE', material: 'GLASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/영경검.png`, isFallback: false },
-    { name: '무드덕', rarity: 'RARE', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/무드덕.png`, isFallback: false },
+    { dexId: 13, name: '크래키', rarity: 'RARE', material: 'NORMAL', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/크래키.png`, isFallback: false },
+    { dexId: 14, name: '히노보즈', rarity: 'RARE', material: 'FIRE', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/히노보즈.png`, isFallback: false },
+    { dexId: 15, name: '스이보즈', rarity: 'RARE', material: 'WATER', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/스이보즈.png`, isFallback: false },
+    { dexId: 16, name: '오리가미', rarity: 'RARE', material: 'GRASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/오리가미.png`, isFallback: false },
+    { dexId: 17, name: '아마다스', rarity: 'RARE', material: 'METAL', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/아마다스.png`, isFallback: false },
+    { dexId: 18, name: '비색조', rarity: 'RARE', material: 'CERAMIC', shape: 'FREEFORM', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/비색조.png`, isFallback: false },
+    { dexId: 19, name: '블록킹', rarity: 'RARE', material: 'PLASTIC', shape: 'SQUARE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/블록킹.png`, isFallback: false },
+    { dexId: 20, name: '영경검', rarity: 'RARE', material: 'GLASS', shape: 'TRIANGLE', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/영경검.png`, isFallback: false },
+    { dexId: 21, name: '무드덕', rarity: 'RARE', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 25, imageUrl: `${STORAGE_BASE_URL}/무드덕.png`, isFallback: false },
 
     // EPIC (총합 280)
-    { name: '파라카스', rarity: 'EPIC', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/파라카스.png`, isFallback: false },
-    { name: '화령조', rarity: 'EPIC', material: 'FIRE', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/화령조.png`, isFallback: false },
-    { name: '아쿠아냥', rarity: 'EPIC', material: 'WATER', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아냥.png`, isFallback: false },
-    { name: '아쿠아엘', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아엘.png`, isFallback: false },
-    { name: '클로버드', rarity: 'EPIC', material: 'GRASS', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/클로버드.png`, isFallback: false },
-    { name: '메탈리퍼', rarity: 'EPIC', material: 'METAL', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/메탈리퍼.png`, isFallback: false },
-    { name: '월영', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/월영.png`, isFallback: false },
-    { name: '트라플라', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/트라플라.png`, isFallback: false },
-    { name: '프리즘퀸', rarity: 'EPIC', material: 'GLASS', shape: 'SQUARE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/프리즘퀸.png`, isFallback: false },
-    { name: '볼트라돈', rarity: 'EPIC', material: 'ELECTRIC', shape: 'LONG', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/볼트라돈.png`, isFallback: false },
+    { dexId: 22, name: '파라카스', rarity: 'EPIC', material: 'NORMAL', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/파라카스.png`, isFallback: false },
+    { dexId: 23, name: '화령조', rarity: 'EPIC', material: 'FIRE', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/화령조.png`, isFallback: false },
+    { dexId: 24, name: '아쿠아냥', rarity: 'EPIC', material: 'WATER', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아냥.png`, isFallback: false },
+    { dexId: 25, name: '아쿠아엘', rarity: 'EPIC', material: 'WATER', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/아쿠아엘.png`, isFallback: false },
+    { dexId: 26, name: '클로버드', rarity: 'EPIC', material: 'GRASS', shape: 'FREEFORM', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/클로버드.png`, isFallback: false },
+    { dexId: 27, name: '메탈리퍼', rarity: 'EPIC', material: 'METAL', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/메탈리퍼.png`, isFallback: false },
+    { dexId: 28, name: '월영', rarity: 'EPIC', material: 'CERAMIC', shape: 'ROUND', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/월영.png`, isFallback: false },
+    { dexId: 29, name: '트라플라', rarity: 'EPIC', material: 'PLASTIC', shape: 'TRIANGLE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/트라플라.png`, isFallback: false },
+    { dexId: 30, name: '프리즘퀸', rarity: 'EPIC', material: 'GLASS', shape: 'SQUARE', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/프리즘퀸.png`, isFallback: false },
+    { dexId: 31, name: '볼트라돈', rarity: 'EPIC', material: 'ELECTRIC', shape: 'LONG', dropWeight: 5, imageUrl: `${STORAGE_BASE_URL}/볼트라돈.png`, isFallback: false },
 
     // FALLBACK (관상용/피규어 버기)
-    { name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 1, imageUrl: `${STORAGE_BASE_URL}/버기.png`, isFallback: true },
+    { dexId: 32, name: '버기', rarity: 'EPIC', material: 'ELECTRIC', shape: 'ROUND', dropWeight: 1, imageUrl: `${STORAGE_BASE_URL}/버기.png`, isFallback: true },
   ];
 
   // 4. 스탯 자동 연산 후 DB 생성
@@ -151,6 +151,7 @@ async function main() {
   // 5. 보스 데이터 생성 (파리지옥: 풀 타입 상성 적용)
   await prisma.boss.create({
     data: {
+      dexId: 1,
       name: '파리지옥',
       imageUrl: `${STORAGE_BASE_URL}/파리지옥.png`,
       hp: 2000,
