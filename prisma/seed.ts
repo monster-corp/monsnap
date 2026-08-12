@@ -162,6 +162,22 @@ async function main() {
   });
   console.log('✅ 보스(파리지옥 - 풀 타입 상성) 데이터 생성 완료');
 
+  // 6. 미션 데이터
+  const missions = [
+    {code: 'DAILY_SCAN', title: '오늘 3번 스캔하기', cycle: 'DAILY', conditionType: 'SCAN_COUNT', targetCount: 3, displayOrder: 1},
+    {code: 'DAILY_WALK_SESSION', title: '걷기 2번 시작하기', cycle: 'DAILY', conditionType: 'WALK_SESSION_COUNT', targetCount: 2, displayOrder: 2},
+    {code: 'DAILY_STEPS', title: '3000걸음 걷기', cycle: 'DAILY', conditionType: 'TOTAL_STEPS', targetCount: 3000, displayOrder: 3},
+    {code: 'DAILY_HATCH', title: '알 1개 부화하기', cycle: 'DAILY', conditionType: 'HATCH_COUNT', targetCount: 1, displayOrder: 4},
+    {code: 'WEEKLY_SCAN', title: '이번 주 15번 스캔하기', cycle: 'WEEKLY', conditionType: 'SCAN_COUNT', targetCount: 15, displayOrder: 1},
+    {code: 'WEEKLY_DEX', title: '도감 3종 등록하기', cycle: 'WEEKLY', conditionType: 'DEX_REGISTER_COUNT', targetCount: 3, displayOrder: 2},
+    {code: 'WEEKLY_DAILY_CLEAR', title: '일일 미션 15회 클리어', cycle: 'WEEKLY', conditionType: 'DAILY_MISSION_CLEAR', targetCount: 15, displayOrder: 3},
+  ];
+
+  for (const mission of missions) {
+    await prisma.mission.create({data: mission});
+  }
+  console.log(`✅ 미션 ${missions.length}종 생성 완료`);
+
   console.log('🎉 모든 Seed 데이터 초기화 및 재생성이 완벽하게 완료되었습니다!');
 }
 
