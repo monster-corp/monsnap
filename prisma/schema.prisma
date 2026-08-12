@@ -25,6 +25,7 @@ model User {
   eggWalkSessions EggWalkSession[]
   userMonsters    UserMonster[]
   battleLogs      BattleLog[]
+  userMissions    UserMission[]
 
   @@map("users")
 }
@@ -116,6 +117,7 @@ model EggWalkSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([eggId])
+  @@index([userId, startedAt])
   @@map("egg_walk_sessions")
 }
 
@@ -177,4 +179,42 @@ model BattleLog {
   @@index([userId])
   @@index([createdAt])
   @@map("battle_logs")
+}
+
+model Mission {
+  id            BigInt   @id @default(autoincrement())
+  code          String   @unique @db.VarChar(50)
+  title         String   @db.VarChar(100)
+  cycle         String   @db.VarChar(20)
+  conditionType String   @map("condition_type") @db.VarChar(50)
+  targetCount   Int      @map("target_count")
+  conditionMeta Json?    @map("condition_meta")
+  rewardType    String?  @map("reward_type") @db.VarChar(50)
+  rewardAmount  Int?     @map("reward_amount")
+  displayOrder  Int      @default(0) @map("display_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  userMissions UserMission[]
+
+  @@map("missions")
+}
+
+model UserMission {
+  id          BigInt    @id @default(autoincrement())
+  userId      BigInt    @map("user_id")
+  missionId   BigInt    @map("mission_id")
+  periodKey   String    @map("period_key") @db.VarChar(20)
+  completedAt DateTime? @map("completed_at")
+  claimedAt   DateTime? @map("claimed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission Mission @relation(fields: [missionId], references: [id])
+
+  @@unique([userId, missionId, periodKey])
+  @@index([userId, periodKey])
+  @@index([userId, completedAt])
+  @@map("user_missions")
 }
