@@ -7,8 +7,8 @@ export type UserMonsterWithMonster = Prisma.UserMonsterGetPayload<{
 
 // 아래 속성을 제외한 나머지 값으로 정렬 불가능
 const SORT_FIELDS = {
-    //TODO: monsterId는 DB ID값이 아닌 개별값 사용 시 수정 필요
     monsterId: "monsterId",
+    dexId: "monster.dexId",
     level: "level",
     catchCount: "catchCount",
     firstCaughtAt: "firstCaughtAt",
@@ -19,7 +19,7 @@ const SORT_FIELDS = {
 export type SortField = keyof typeof SORT_FIELDS;
 export type SortOrder = "asc" | "desc";
 
-const DEFAULT_SORT_FIELD: SortField = "monsterId";
+const DEFAULT_SORT_FIELD: SortField = "dexId";
 const DEFAULT_SORT_ORDER: SortOrder = "asc";
 
 const APP_SORT_FIELDS = new Set<SortField>(["name", "rarity"]);
@@ -58,8 +58,10 @@ function compareByField(
             return a.monster.name.localeCompare(b.monster.name, "ko");
         case "rarity":
             return RARITY_ORDER[a.monster.rarity] - RARITY_ORDER[b.monster.rarity];
+        case "dexId":
+            return a.monster.dexId - b.monster.dexId;
         case "monsterId":
-            return Number(a.monsterId - b.monsterId);
+            return a.monsterId < b.monsterId ? -1 : a.monsterId > b.monsterId ? 1 : 0;
         case "level":
             return a.level - b.level;
         case "catchCount":
@@ -96,8 +98,10 @@ export async function getUserMonsters(
     return prisma.userMonster.findMany({
         where: {userId},
         include: {monster: true},
-        orderBy: sortFields.map((field, i) => ({
-            [SORT_FIELDS[field]]: sortOrders[i],
-        })),
+        orderBy: sortFields.map((field, i) =>
+            field === "dexId"
+                ? {monster: {dexId: sortOrders[i]}}
+                : {[SORT_FIELDS[field]]: sortOrders[i]}
+        ),
     });
 }
