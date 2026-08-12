@@ -185,6 +185,7 @@ model Mission {
   id            BigInt   @id @default(autoincrement())
   code          String   @unique @db.VarChar(50)
   title         String   @db.VarChar(100)
+  description   String?  @db.Text
   cycle         String   @db.VarChar(20)
   conditionType String   @map("condition_type") @db.VarChar(50)
   targetCount   Int      @map("target_count")

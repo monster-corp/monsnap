@@ -55,3 +55,12 @@ export function getPeriodEnd(cycle: MissionCycle, now: Date = new Date()): Date 
     const days = cycle === MissionCycle.WEEKLY ? 7 : 1;
     return new Date(start.getTime() + days * DAY_MS);
 }
+
+/**
+ * 주어진 시각이 KST 기준 [startHour, endHour) 범위에 속하는지 판정한다.
+ * endHour는 배타적이므로 20~24는 20:00:00부터 23:59:59까지를 의미한다.
+ */
+export function isInKstHourRange(t: Date, startHour: number, endHour: number): boolean {
+    const kstHour = new Date(t.getTime() + KST_OFFSET_MS).getUTCHours();
+    return kstHour >= startHour && kstHour < endHour;
+}
