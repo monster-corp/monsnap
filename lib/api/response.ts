@@ -30,6 +30,10 @@ export const ERROR = {
     // 422
     INVALID_STEP_COUNT: {code: 42200, message: "걸음 수 형식이 올바르지 않습니다"},
 
+    // 429
+    SCAN_CHARGE_EMPTY: {code: 42900, message: "스캔 충전량이 부족합니다"},
+    SCAN_BLOCK_RATE_EXCEEDED: {code: 42901, message: "차단된 스캔 시도가 너무 많습니다. 잠시 후 다시 시도해주세요"},
+
     // 500
     INTERNAL_ERROR: {code: 50000, message: "일시적인 오류가 발생했습니다"},
 

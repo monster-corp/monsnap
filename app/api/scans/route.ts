@@ -2,11 +2,12 @@ import {NextRequest} from "next/server";
 import {ApiError, respondWithStatus} from "@/lib/api/response";
 import {callVlm} from "@/lib/vlm";
 import {BLOCK_REASON_TO_ERROR} from "@/lib/schemas/vlm";
-import {prisma} from "@/lib/prisma";
 import {matchMonster} from "@/lib/matching";
 import {assertEggSlotAvailable, createEggFromScan} from "@/lib/eggs";
 import {getCurrentUserId} from "@/lib/auth";
 import {isAllowedImageType} from "@/lib/image";
+import {assertBlockRateOk, assertScanChargeAvailable} from "@/lib/scan-charge";
+import {createScanAndSettleCharge} from "@/lib/scans";
 
 export const maxDuration = 60;
 
@@ -34,36 +35,36 @@ export async function POST(request: NextRequest) {
             return respondWithStatus("INVALID_IMAGE");
         }
 
+        await assertBlockRateOk(userId);
+        await assertScanChargeAvailable(userId);
         await assertEggSlotAvailable(userId);
 
         const vlmResult = await callVlm(image);
 
-        const {material, shape, confidence, block_reason} = vlmResult;
-        const isBlocked = block_reason !== "NONE";
+        const settlement = await createScanAndSettleCharge(userId, vlmResult);
 
-        const scan = await prisma.scan.create({
-            data: {
-                userId,
-                extractedAttributes: vlmResult,
-                material: isBlocked ? null : material,
-                shape: isBlocked ? null : shape,
-                similarityScore: confidence,
-                blockReason: block_reason,
-            },
-        });
-
-        const blockErrorKey = BLOCK_REASON_TO_ERROR[block_reason];
+        const blockErrorKey = BLOCK_REASON_TO_ERROR[vlmResult.block_reason];
         if (blockErrorKey) {
-            return respondWithStatus(blockErrorKey, {scanId: scan.id.toString()});
+            return respondWithStatus(blockErrorKey, {
+                scanId: settlement.scanId.toString(),
+                chargeConsumed: settlement.chargeConsumed,
+                scanCharge: settlement.chargeState,
+            });
         }
 
-        const monster = await matchMonster({material, shape, confidence});
-        const egg = await createEggFromScan(userId, scan.id, monster);
+        const monster = await matchMonster({
+            material: settlement.material!,
+            shape: settlement.shape!,
+            confidence: settlement.confidence,
+        });
+
+        const egg = await createEggFromScan(userId, settlement.scanId, monster);
 
         return respondWithStatus("OK", {
             eggId: egg.id.toString(),
             status: egg.status,
             requiredSteps: egg.requiredSteps,
+            scanCharge: settlement.chargeState,
         });
     } catch (err) {
         if (err instanceof ApiError) {

@@ -13,10 +13,12 @@ datasource db {
 }
 
 model User {
-  id        BigInt   @id @default(autoincrement())
-  nickname  String   @db.VarChar(50)
-  anonToken String   @unique @default(dbgenerated("gen_random_uuid()")) @map("anon_token") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
+  id            BigInt   @id @default(autoincrement())
+  nickname      String   @db.VarChar(50)
+  anonToken     String   @unique @default(dbgenerated("gen_random_uuid()")) @map("anon_token") @db.Uuid
+  scanCharges   Int      @default(5) @map("scan_charges")
+  lastChargedAt DateTime @default(now()) @map("last_charged_at")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   scans           Scan[]
   eggs            Egg[]
@@ -74,6 +76,7 @@ model Scan {
   @@index([userId])
   @@index([material, shape])
   @@index([createdAt])
+  @@index([userId, createdAt])
   @@map("scans")
 }
 

@@ -12,6 +12,9 @@ export async function createEggFromScan(
     monster: Pick<Monster, "id" | "rarity">
 ): Promise<Egg> {
     return prisma.$transaction(async (tx) => {
+        // 같은 유저의 동시 요청을 직렬화한다.
+        await tx.$executeRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+
         const activeCount = await tx.egg.count({
             where: {
                 userId,
@@ -25,7 +28,7 @@ export async function createEggFromScan(
 
         const stepRequirement = await tx.rarityStepRequirement.findUniqueOrThrow({
             where: {
-                rarity: monster.rarity
+                rarity: monster.rarity,
             },
         });
 
