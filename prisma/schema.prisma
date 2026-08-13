@@ -108,6 +108,7 @@ model EggWalkSession {
   eggId         BigInt    @map("egg_id")
   userId        BigInt    @map("user_id")
   startedAt     DateTime  @default(now()) @map("started_at")
+  lastActiveAt  DateTime  @default(now()) @map("last_active_at")
   endedAt       DateTime? @map("ended_at")
   stepsCaptured Int       @default(0) @map("steps_captured")
   endReason     String?   @map("end_reason") @db.VarChar(20)

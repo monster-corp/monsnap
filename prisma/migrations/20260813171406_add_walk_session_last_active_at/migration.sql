@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "egg_walk_sessions" ADD COLUMN     "last_active_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
