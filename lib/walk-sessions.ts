@@ -10,15 +10,41 @@ import {
     WalkSessionNotFoundError,
 } from "@/lib/errors/walk-session";
 import {EggStatus, WalkSessionEndReason, WalkSessionEndReasonType, WalkSessionStatus,} from "@/lib/status";
+import {WALK_SESSION_TIMEOUT_MS} from "@/lib/constants/walk-session";
+
+type Tx = Prisma.TransactionClient;
+
+async function expireStaleSession(tx: Tx, userId: bigint): Promise<void> {
+    const threshold = new Date(Date.now() - WALK_SESSION_TIMEOUT_MS);
+
+    await tx.eggWalkSession.updateMany({
+        where: {
+            userId,
+            status: WalkSessionStatus.ACTIVE,
+            lastActiveAt: {lt: threshold},
+        },
+        data: {
+            status: WalkSessionStatus.ENDED,
+            endedAt: new Date(),
+            endReason: WalkSessionEndReason.TIMEOUT,
+        },
+    });
+}
+
+export type CreateWalkSessionResult = {
+    session: EggWalkSession;
+    egg: Egg;
+};
 
 export async function createWalkSession(
     userId: bigint,
     eggId: bigint
-): Promise<EggWalkSession> {
+): Promise<CreateWalkSessionResult> {
     return prisma.$transaction(async (tx) => {
+        await expireStaleSession(tx, userId);
+
         const egg = await tx.egg.findFirst({
             where: {id: eggId, userId},
-            select: {id: true, status: true},
         });
         if (!egg) {
             throw new EggNotFoundError();
@@ -28,13 +54,8 @@ export async function createWalkSession(
         }
 
         const active = await tx.eggWalkSession.findFirst({
-            where: {
-                userId,
-                status: WalkSessionStatus.ACTIVE,
-            },
-            select: {
-                id: true,
-            },
+            where: {userId, status: WalkSessionStatus.ACTIVE},
+            select: {id: true},
         });
 
         if (active) {
@@ -42,17 +63,15 @@ export async function createWalkSession(
         }
 
         try {
-            return tx.eggWalkSession.create({
-                data: {
-                    eggId,
-                    userId,
-                },
+            const session = await tx.eggWalkSession.create({
+                data: {eggId, userId},
             });
+
+            return {session, egg};
         } catch (err) {
             if (
-                err instanceof Prisma.PrismaClientKnownRequestError
-                && err.code === "P2002"
-                && err.meta?.target === "egg_walk_sessions_one_active_per_user"
+                err instanceof Prisma.PrismaClientKnownRequestError &&
+                err.code === "P2002"
             ) {
                 throw new SessionAlreadyActiveError();
             }
@@ -98,7 +117,10 @@ export async function applyStepsToWalkSession(
 
             const updatedSession = await tx.eggWalkSession.update({
                 where: {id: sessionId},
-                data: {stepsCaptured: clientStepsCaptured},
+                data: {
+                    stepsCaptured: clientStepsCaptured,
+                    lastActiveAt: new Date(),
+                },
             });
 
             const newCurrentSteps = Math.min(
