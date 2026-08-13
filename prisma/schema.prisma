@@ -132,6 +132,10 @@ model UserMonster {
   ivAttack      Int      @default(0) @map("iv_attack")
   ivDefense     Int      @default(0) @map("iv_defense")
   ivSpeed       Int      @default(0) @map("iv_speed")
+  pendingIvHp      Int? @map("pending_iv_hp")
+  pendingIvAttack  Int? @map("pending_iv_attack")
+  pendingIvDefense Int? @map("pending_iv_defense")
+  pendingIvSpeed   Int? @map("pending_iv_speed")
   firstCaughtAt DateTime @default(now()) @map("first_caught_at")
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
