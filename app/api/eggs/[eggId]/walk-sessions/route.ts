@@ -19,13 +19,18 @@ export async function POST(_request: NextRequest, {params}: RouteContext) {
             return respondWithStatus("INVALID_REQUEST");
         }
 
-        const session = await createWalkSession(userId, parsedEggId);
+        const {session, egg} = await createWalkSession(userId, parsedEggId);
 
         return respondWithStatus("OK", {
             sessionId: session.id.toString(),
-            eggId: session.eggId.toString(),
             status: session.status,
             startedAt: session.startedAt.toISOString(),
+            egg: {
+                id: egg.id.toString(),
+                currentSteps: egg.currentSteps,
+                requiredSteps: egg.requiredSteps,
+                status: egg.status,
+            },
         });
     } catch (err) {
         if (err instanceof ApiError) {

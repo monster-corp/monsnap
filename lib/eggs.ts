@@ -4,6 +4,7 @@ import {EggStatus, WalkSessionEndReason, WalkSessionStatus} from "@/lib/status";
 import type {Egg, Monster, UserMonster} from "@/app/generated/prisma/client";
 import {EggNotFoundError} from "@/lib/errors/walk-session";
 import {calculateFinalStats, FinalStats, generateRandomIVs, IVStats} from "@/lib/stats";
+import {WALK_SESSION_TIMEOUT_MS} from "@/lib/constants/walk-session";
 
 const MAX_ACTIVE_EGGS = 3;
 
@@ -154,7 +155,10 @@ export function getUserEggs(userId: bigint) {
             requiredSteps: true,
             monster: {select: {imageUrl: true}},
             eggWalkSessions: {
-                where: {status: WalkSessionStatus.ACTIVE},
+                where: {
+                    status: WalkSessionStatus.ACTIVE,
+                    lastActiveAt: {gte: new Date(Date.now() - WALK_SESSION_TIMEOUT_MS)},
+                },
                 select: {id: true},
             },
         },
