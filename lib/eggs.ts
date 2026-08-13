@@ -13,7 +13,9 @@ export async function createEggFromScan(
     monster: Pick<Monster, "id" | "rarity">
 ): Promise<Egg> {
     return prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id
+                             FROM users
+                             WHERE id = ${userId} FOR UPDATE`;
 
         const activeCount = await tx.egg.count({
             where: {userId, status: {not: EggStatus.HATCHED}},
@@ -52,7 +54,9 @@ export async function hatchEgg(userId: bigint, eggId: bigint): Promise<HatchEggR
     return prisma.$transaction(async (tx) => {
         // 만약 유저가 서로 다른 egg 두 개를 동시에 부화 요청하면,
         // 두 hatchEgg 트랜잭션이 같은 User 행을 잠그려고 경쟁하다가 하나가 완료될 때까지 다른 하나가 대기함
-        await tx.$executeRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id
+                             FROM users
+                             WHERE id = ${userId} FOR UPDATE`;
 
         const egg = await tx.egg.findFirst({
             where: {id: eggId, userId},
@@ -148,6 +152,7 @@ export function getUserEggs(userId: bigint) {
             status: true,
             currentSteps: true,
             requiredSteps: true,
+            monster: {select: {imageUrl: true}},
             eggWalkSessions: {
                 where: {status: WalkSessionStatus.ACTIVE},
                 select: {id: true},
