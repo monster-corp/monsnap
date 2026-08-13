@@ -1,7 +1,8 @@
 import {NextRequest} from "next/server";
 import {getCurrentUserId} from "@/lib/auth";
 import {ApiError, respondWithStatus} from "@/lib/api/response";
-import {getUserMonsters, parseSortFields, parseSortOrders} from "@/lib/user-monsters";
+import {extractPendingIv, getUserMonsters, parseSortFields, parseSortOrders} from "@/lib/user-monsters";
+import {calculateFinalStats} from "@/lib/stats";
 
 export async function GET(request: NextRequest) {
     try {
@@ -19,25 +20,36 @@ export async function GET(request: NextRequest) {
         return respondWithStatus("OK", {
             sort: sortFields,
             order: sortOrders,
-            userMonsters: userMonsters.map((um) => ({
-                userMonsterId: um.id.toString(),
-                monsterId: um.monsterId.toString(),
-                dexId: um.monster.dexId,
-                name: um.monster.name,
-                rarity: um.monster.rarity,
-                material: um.monster.material,
-                shape: um.monster.shape,
-                imageUrl: um.monster.imageUrl,
-                level: um.level,
-                catchCount: um.catchCount,
-                firstCaughtAt: um.firstCaughtAt.toISOString(),
-                baseStats: {
-                    hp: um.monster.baseHp,
-                    attack: um.monster.baseAttack,
-                    defense: um.monster.baseDefense,
-                    speed: um.monster.baseSpeed,
-                },
-            })),
+            userMonsters: userMonsters.map((um) => {
+                const pendingIv = extractPendingIv(um);
+
+                return {
+                    userMonsterId: um.id.toString(),
+                    monsterId: um.monsterId.toString(),
+                    dexId: um.monster.dexId,
+                    name: um.monster.name,
+                    rarity: um.monster.rarity,
+                    material: um.monster.material,
+                    shape: um.monster.shape,
+                    imageUrl: um.monster.imageUrl,
+                    level: um.level,
+                    catchCount: um.catchCount,
+                    firstCaughtAt: um.firstCaughtAt.toISOString(),
+                    baseStats: {
+                        hp: um.monster.baseHp,
+                        attack: um.monster.baseAttack,
+                        defense: um.monster.baseDefense,
+                        speed: um.monster.baseSpeed,
+                    },
+                    // 개체값이 반영된 실제 능력치
+                    currentStats: calculateFinalStats(um.monster, um),
+                    // 대기 중인 개체값 제안. 없으면 null
+                    pendingIv,
+                    pendingStats: pendingIv
+                        ? calculateFinalStats(um.monster, pendingIv)
+                        : null,
+                };
+            }),
         });
     } catch (err) {
         if (err instanceof ApiError) {

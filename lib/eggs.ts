@@ -3,6 +3,7 @@ import {EggNotHatchableError, EggSlotFullError} from "@/lib/errors/eggs";
 import {EggStatus, WalkSessionEndReason, WalkSessionStatus} from "@/lib/status";
 import type {Egg, Monster, UserMonster} from "@/app/generated/prisma/client";
 import {EggNotFoundError} from "@/lib/errors/walk-session";
+import {calculateFinalStats, FinalStats, generateRandomIVs, IVStats} from "@/lib/stats";
 
 const MAX_ACTIVE_EGGS = 3;
 
@@ -12,14 +13,10 @@ export async function createEggFromScan(
     monster: Pick<Monster, "id" | "rarity">
 ): Promise<Egg> {
     return prisma.$transaction(async (tx) => {
-        // 같은 유저의 동시 요청을 직렬화한다.
         await tx.$executeRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
 
         const activeCount = await tx.egg.count({
-            where: {
-                userId,
-                status: {not: EggStatus.HATCHED},
-            },
+            where: {userId, status: {not: EggStatus.HATCHED}},
         });
 
         if (activeCount >= MAX_ACTIVE_EGGS) {
@@ -27,9 +24,7 @@ export async function createEggFromScan(
         }
 
         const stepRequirement = await tx.rarityStepRequirement.findUniqueOrThrow({
-            where: {
-                rarity: monster.rarity,
-            },
+            where: {rarity: monster.rarity},
         });
 
         return tx.egg.create({
@@ -48,10 +43,17 @@ export type HatchEggResult = {
     monster: Monster;
     userMonster: UserMonster;
     isNewMonster: boolean;
+    rolledIv: IVStats;
+    rolledStats: FinalStats;
+    currentStats: FinalStats;
 };
 
 export async function hatchEgg(userId: bigint, eggId: bigint): Promise<HatchEggResult> {
     return prisma.$transaction(async (tx) => {
+        // 만약 유저가 서로 다른 egg 두 개를 동시에 부화 요청하면,
+        // 두 hatchEgg 트랜잭션이 같은 User 행을 잠그려고 경쟁하다가 하나가 완료될 때까지 다른 하나가 대기함
+        await tx.$executeRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+
         const egg = await tx.egg.findFirst({
             where: {id: eggId, userId},
             include: {monster: true},
@@ -73,9 +75,6 @@ export async function hatchEgg(userId: bigint, eggId: bigint): Promise<HatchEggR
 
         const updatedEgg = {...egg, status: EggStatus.HATCHED, hatchedAt};
 
-        // 정상 플로우에서는 READY 도달 후 walk session이 이미 종료되어 있어 대상이 없다.
-        // 예외적으로 ACTIVE 세션이 남아 있다면 부화와 함께 자동 종료한다.
-        // 현재는 READY 상태에서만 부화가 가능하므로 STEP_GOAL_REACHED로 기록한다.
         await tx.eggWalkSession.updateMany({
             where: {eggId, userId, status: WalkSessionStatus.ACTIVE},
             data: {
@@ -85,23 +84,58 @@ export async function hatchEgg(userId: bigint, eggId: bigint): Promise<HatchEggR
             },
         });
 
-        const userMonster = await tx.userMonster.upsert({
-            where: {
-                userId_monsterId: {userId, monsterId: egg.monsterId}
+        const rolledIv = generateRandomIVs();
+        const rolledStats = calculateFinalStats(egg.monster, rolledIv);
+
+        const existing = await tx.userMonster.findUnique({
+            where: {userId_monsterId: {userId, monsterId: egg.monsterId}},
+        });
+
+        // 첫 포획이면 개체값을 즉시 확정한다. 비교 대상이 없으므로 확인 절차가 불필요하다.
+        if (!existing) {
+            const userMonster = await tx.userMonster.create({
+                data: {
+                    userId,
+                    monsterId: egg.monsterId,
+                    eggId,
+                    catchCount: 1,
+                    ...rolledIv,
+                },
+            });
+
+            return {
+                egg: updatedEgg,
+                monster: egg.monster,
+                userMonster,
+                isNewMonster: true,
+                rolledIv,
+                rolledStats,
+                currentStats: rolledStats,
+            };
+        }
+
+        // 중복 포획. 개체값 우열은 스탯 역할에 따라 달라지므로(공격형/방어형 등)
+        // 총합으로 서버가 걸러내지 않고 항상 제안하여 유저가 결정하게 한다.
+        const userMonster = await tx.userMonster.update({
+            where: {id: existing.id},
+            data: {
+                catchCount: {increment: 1},
+                eggId,
+                pendingIvHp: rolledIv.ivHp,
+                pendingIvAttack: rolledIv.ivAttack,
+                pendingIvDefense: rolledIv.ivDefense,
+                pendingIvSpeed: rolledIv.ivSpeed,
             },
-            update: {
-                catchCount: {increment: 1}, eggId
-            },
-            create: {
-                userId, monsterId: egg.monsterId, eggId, catchCount: 1
-            }
-        })
+        });
 
         return {
             egg: updatedEgg,
             monster: egg.monster,
             userMonster,
-            isNewMonster: userMonster.catchCount === 1,
+            isNewMonster: false,
+            rolledIv,
+            rolledStats,
+            currentStats: calculateFinalStats(egg.monster, existing),
         };
     });
 }
