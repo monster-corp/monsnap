@@ -25,10 +25,11 @@ export async function POST(_request: NextRequest, {params}: RouteContext) {
             egg: {
                 id: result.egg.id.toString(),
                 status: result.egg.status,
-                hatchedAt: result.egg.hatchedAt?.toString() ?? null,
+                hatchedAt: result.egg.hatchedAt?.toISOString() ?? null,
             },
             monster: {
                 id: result.monster.id.toString(),
+                dexId: result.monster.dexId,
                 name: result.monster.name,
                 rarity: result.monster.rarity,
                 material: result.monster.material,
@@ -37,11 +38,14 @@ export async function POST(_request: NextRequest, {params}: RouteContext) {
             },
             userMonster: {
                 id: result.userMonster.id.toString(),
-                monsterId: result.monster.id.toString(),
+                monsterId: result.userMonster.monsterId.toString(),
                 catchCount: result.userMonster.catchCount,
                 level: result.userMonster.level,
             },
             isNewMonster: result.isNewMonster,
+            currentStats: result.currentStats,
+            rolledIv: result.rolledIv,
+            rolledStats: result.rolledStats,
         });
     } catch (err) {
         if (err instanceof ApiError) {
