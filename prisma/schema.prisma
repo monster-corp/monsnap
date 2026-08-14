@@ -108,6 +108,7 @@ model EggWalkSession {
   eggId         BigInt    @map("egg_id")
   userId        BigInt    @map("user_id")
   startedAt     DateTime  @default(now()) @map("started_at")
+  lastActiveAt  DateTime  @default(now()) @map("last_active_at")
   endedAt       DateTime? @map("ended_at")
   stepsCaptured Int       @default(0) @map("steps_captured")
   endReason     String?   @map("end_reason") @db.VarChar(20)
@@ -132,6 +133,10 @@ model UserMonster {
   ivAttack      Int      @default(0) @map("iv_attack")
   ivDefense     Int      @default(0) @map("iv_defense")
   ivSpeed       Int      @default(0) @map("iv_speed")
+  pendingIvHp      Int? @map("pending_iv_hp")
+  pendingIvAttack  Int? @map("pending_iv_attack")
+  pendingIvDefense Int? @map("pending_iv_defense")
+  pendingIvSpeed   Int? @map("pending_iv_speed")
   firstCaughtAt DateTime @default(now()) @map("first_caught_at")
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)

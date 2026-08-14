@@ -18,6 +18,7 @@ export const ERROR = {
     // 404
     EGG_NOT_FOUND: {code: 40400, message: "해당 알을 찾을 수 없습니다"},
     WALK_SESSION_NOT_FOUND: {code: 40401, message: "해당 워크 세션을 찾을 수 없습니다"},
+    USER_MONSTER_NOT_FOUND: {code: 40402, message: "보유하지 않은 몬스터입니다"},
 
     // 409
     EGG_SLOT_FULL: {code: 40900, message: "알 보관함이 가득 찼습니다"},
@@ -26,6 +27,7 @@ export const ERROR = {
     STEP_COUNT_REGRESSED: {code: 40903, message: "이전보다 작은 누적 걸음 수는 전송할 수 없습니다"},
     EGG_NOT_WALKABLE: {code: 40904, message: "걷기가 가능한 상태의 알이 아닙니다"},
     EGG_NOT_HATCHABLE: {code: 40905, message: "인화(부화)할 수 없는 상태의 알입니다"},
+    NO_PENDING_IV: {code: 40906, message: "확인 대기 중인 개체값이 없습니다"},
 
     // 422
     INVALID_STEP_COUNT: {code: 42200, message: "걸음 수 형식이 올바르지 않습니다"},
