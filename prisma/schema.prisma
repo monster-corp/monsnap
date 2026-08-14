@@ -42,7 +42,8 @@ model Monster {
   baseAttack  Int      @map("base_attack")
   baseDefense Int      @map("base_defense")
   baseSpeed   Int      @map("base_speed")
-  imageUrl    String   @map("image_url")
+  imageUrl        String   @map("image_url")        // 도감용 (배경 포함 원본 일러스트)
+  cutoutImageUrl  String   @map("cutout_image_url") // 알 부화용 (누끼 이미지)
   isFallback  Boolean  @default(false) @map("is_fallback")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -155,6 +156,7 @@ model Boss {
   dexId           Int      @unique @map("dex_id")
   name            String   @db.VarChar(100)
   imageUrl        String   @map("image_url")
+  cutoutImageUrl  String   @map("cutout_image_url")
   hp              Int
   weakAttribute   String?  @map("weak_attribute") @db.VarChar(20)
   strongAttribute String?  @map("strong_attribute") @db.VarChar(20)
