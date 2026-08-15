@@ -153,7 +153,12 @@ export function getUserEggs(userId: bigint) {
             status: true,
             currentSteps: true,
             requiredSteps: true,
-            monster: {select: {imageUrl: true}},
+            monster: {
+                select: {
+                    imageUrl: true,
+                    cutoutImageUrl: true
+                }
+            },
             eggWalkSessions: {
                 where: {
                     status: WalkSessionStatus.ACTIVE,
