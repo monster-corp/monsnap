@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   },
   {
     label: '배틀',
-    href: '/battles',
+    href: '/bosses',
     icon: Swords,
   },
 ];
