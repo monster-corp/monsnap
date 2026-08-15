@@ -67,6 +67,7 @@ async function main() {
   console.log('🧹 기존 DB 데이터 삭제 중...');
   await prisma.battleLog.deleteMany();
   await prisma.eggWalkSession.deleteMany();
+  await prisma.mission.deleteMany();
   await prisma.userMonster.deleteMany();
   await prisma.egg.deleteMany();
   await prisma.scan.deleteMany();
