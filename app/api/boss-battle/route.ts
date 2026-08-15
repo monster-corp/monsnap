@@ -11,11 +11,11 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
     const bossId = searchParams.get('bossId');
-    const userMonsterId = searchParams.get('userMonsterId'); // 유저의 특정 몬스터 ID 추가 수신 권장
+    const userMonsterId = searchParams.get('userMonsterId');
 
     if (!userId || !bossId) {
       return NextResponse.json(
-        { code: 400, message: 'userId와 bossId가 필요합니다.', data: null },
+        { code: 40000, message: 'userId와 bossId가 필요합니다.', data: null },
         { status: 400 }
       );
     }
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
     if (!boss || !userMonster) {
       return NextResponse.json(
-        { code: 404, message: '보스 또는 몬스터 정보를 찾을 수 없습니다.', data: null },
+        { code: 40400, message: '보스 또는 몬스터 정보를 찾을 수 없습니다.', data: null },
         { status: 404 }
       );
     }
@@ -56,30 +56,33 @@ export async function GET(req: Request) {
       }
     );
 
-    return NextResponse.json({
-      code: 200,
-      message: '보스전 정보 조회가 완료되었습니다.',
-      data: {
-        boss: {
-          id: boss.id.toString(),
-          name: boss.name,
-          hp: boss.hp,
-          weakAttribute: boss.weakAttribute,
-          strongAttribute: boss.strongAttribute,
-          cutoutImageUrl: boss.cutoutImageUrl ?? null,
-        },
-        monster: {
-          id: userMonster.id.toString(),
-          name: userMonster.monster.name,
-          baseAttack: finalStats.attack,
-          material: userMonster.monster.material,
+    return NextResponse.json(
+      {
+        code: 20000,
+        message: '보스전 정보 조회가 완료되었습니다.',
+        data: {
+          boss: {
+            id: boss.id.toString(),
+            name: boss.name,
+            hp: boss.hp,
+            weakAttribute: boss.weakAttribute,
+            strongAttribute: boss.strongAttribute,
+            cutoutImageUrl: boss.cutoutImageUrl ?? null,
+          },
+          monster: {
+            id: userMonster.id.toString(),
+            name: userMonster.monster.name,
+            baseAttack: finalStats.attack,
+            material: userMonster.monster.material,
+          },
         },
       },
-    });
+      { status: 200 }
+    );
   } catch (error) {
     console.error('GET Boss Battle Error:', error);
     return NextResponse.json(
-      { code: 500, message: '서버 내부 오류가 발생했습니다.', data: null },
+      { code: 50000, message: '서버 내부 오류가 발생했습니다.', data: null },
       { status: 500 }
     );
   }
@@ -103,7 +106,7 @@ export async function POST(req: Request) {
 
     if (!userId || !bossId || !userMonsterId) {
       return NextResponse.json(
-        { code: 400, message: '필수 데이터가 누락되었습니다.', data: null },
+        { code: 40000, message: '필수 데이터가 누락되었습니다.', data: null },
         { status: 400 }
       );
     }
@@ -124,18 +127,21 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({
-      code: 200,
-      message: '보스전 결과 기록이 완료되었습니다.',
-      data: {
-        logId: log.id.toString(),
-        isCleared,
+    return NextResponse.json(
+      {
+        code: 20000,
+        message: '보스전 결과 기록이 완료되었습니다.',
+        data: {
+          logId: log.id.toString(),
+          isCleared,
+        },
       },
-    });
+      { status: 200 }
+    );
   } catch (error) {
     console.error('POST Boss Battle Error:', error);
     return NextResponse.json(
-      { code: 500, message: '서버 내부 오류가 발생했습니다.', data: null },
+      { code: 50000, message: '서버 내부 오류가 발생했습니다.', data: null },
       { status: 500 }
     );
   }
