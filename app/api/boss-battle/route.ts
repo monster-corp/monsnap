@@ -1,35 +1,49 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calculateFinalStats } from '@/lib/stats';
+import { getCurrentUserId } from '@/lib/auth'; // 💡 팀 프로젝트 내 getCurrentUserId 경로에 맞춰 import
 
 // -------------------------------------------------------------------
-// 1. GET: 보스전 시작 시 데이터 조회 (보스 정보 + 내 몬스터 최종 스탯)
-// URL: GET /api/boss-battle?userId=1&bossId=1&userMonsterId=10
+// 1. GET: 보스전 시작 시 데이터 조회
+// URL: GET /api/boss-battle?bossId=1&userMonsterId=10
 // -------------------------------------------------------------------
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-    const bossId = searchParams.get('bossId');
-    const userMonsterId = searchParams.get('userMonsterId');
-
-    if (!userId || !bossId) {
+    // 💡 1. 프론트 파라미터 대신 서버 세션에서 userId 가져오기
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
-        { code: 40000, message: 'userId와 bossId가 필요합니다.', data: null },
+        { code: 40100, message: '인증되지 않은 사용자입니다.', data: null },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const bossId = searchParams.get('bossId');
+    const userMonsterIdParam = searchParams.get('userMonsterId');
+
+    // 💡 2. bossId만 필수 체크 (userId는 상단에서 검증 완료)
+    if (!bossId) {
+      return NextResponse.json(
+        { code: 40000, message: 'bossId가 필요합니다.', data: null },
         { status: 400 }
       );
     }
 
+    // 💡 3. userMonsterId가 유효한 숫자 형태인지 확인 후 처리 (숫자가 아니거나 없으면 기본 몬스터 선택)
+    const isValidMonsterId = userMonsterIdParam && !isNaN(Number(userMonsterIdParam));
+
     const [boss, userMonster] = await Promise.all([
       prisma.boss.findUnique({ where: { id: BigInt(bossId) } }),
-      userMonsterId
+      isValidMonsterId
         ? prisma.userMonster.findFirst({
-            where: { id: BigInt(userMonsterId), userId: BigInt(userId) },
+            where: { id: BigInt(userMonsterIdParam), userId: BigInt(userId) },
             include: { monster: true },
           })
         : prisma.userMonster.findFirst({
             where: { userId: BigInt(userId) },
             include: { monster: true },
+            orderBy: { id: 'asc' }, // 첫 번째 보유 몬스터 가져오기
           }),
     ]);
 
@@ -89,22 +103,32 @@ export async function GET(req: Request) {
 }
 
 // -------------------------------------------------------------------
-// 2. POST: 보스전 종료 시 전투 결과 저장 (MVP: 보상 처리 제외)
+// 2. POST: 보스전 종료 시 전투 결과 저장
 // URL: POST /api/boss-battle
 // -------------------------------------------------------------------
 export async function POST(req: Request) {
   try {
+    // 💡 1. 서버 세션에서 userId 가져오기
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { code: 40100, message: '인증되지 않은 사용자입니다.', data: null },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
     const {
-      userId,
       bossId,
       userMonsterId,
       damageDealt,
       damageMultiplier,
       isCritical,
       bossHpRemaining,
-    } = await req.json();
+    } = body;
 
-    if (!userId || !bossId || !userMonsterId) {
+    // 💡 2. Body에서 userId 검증 제거 (bossId와 userMonsterId만 검증)
+    if (!bossId || !userMonsterId) {
       return NextResponse.json(
         { code: 40000, message: '필수 데이터가 누락되었습니다.', data: null },
         { status: 400 }
@@ -114,7 +138,7 @@ export async function POST(req: Request) {
     const remainingHp = Math.max(0, bossHpRemaining ?? 0);
     const isCleared = remainingHp === 0;
 
-    // 전투 로그만 DB에 기록
+    // 전투 로그 DB 기록
     const log = await prisma.battleLog.create({
       data: {
         userId: BigInt(userId),
