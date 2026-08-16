@@ -196,7 +196,7 @@ async function main() {
     {
       code: 'DAILY_MORNING_HATCH',
       title: '모닝 리프레시',
-      description: '오전 5시부터 9시 사이에 걸음을 채우고 알을 부화시키세요',
+      description: '5:00~9:00 사이에 걸음을 채우고 알을 부화시키세요',
       cycle: 'DAILY',
       conditionType: 'HATCH_IN_TIME_RANGE',
       targetCount: 1,
@@ -206,7 +206,7 @@ async function main() {
     {
       code: 'DAILY_NIGHT_HATCH',
       title: '나이트 케어',
-      description: '저녁 8시부터 자정 사이에 걸음을 채우고 알을 부화시키세요',
+      description: '20:00~00:00 사이에 걸음을 채우고 알을 부화시키세요',
       cycle: 'DAILY',
       conditionType: 'HATCH_IN_TIME_RANGE',
       targetCount: 1,
