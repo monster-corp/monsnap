@@ -17,8 +17,4 @@ ADD COLUMN     "started_at" TIMESTAMP(3) NOT NULL,
 ADD COLUMN     "touch_count" INTEGER NOT NULL;
 
 -- AlterTable
-ALTER TABLE "bosses" ADD COLUMN     "cutout_image_url" TEXT,
-ADD COLUMN     "time_limit_ms" INTEGER;
-
--- AlterTable
-ALTER TABLE "monsters" ADD COLUMN     "cutout_image_url" TEXT;
+ALTER TABLE "bosses" ADD COLUMN     "time_limit_ms" INTEGER;
