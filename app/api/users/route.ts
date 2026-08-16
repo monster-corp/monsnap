@@ -2,8 +2,9 @@ import {NextRequest} from "next/server";
 import {cookies} from "next/headers";
 import {z} from "zod";
 import {prisma} from "@/lib/prisma";
-import {respondWithStatus} from "@/lib/api/response";
-import {ANON_TOKEN_COOKIE} from "@/lib/auth";
+import {ApiError, respondWithStatus} from "@/lib/api/response";
+import {ANON_TOKEN_COOKIE, getCurrentUserId} from "@/lib/auth";
+import {getUserProfile} from "@/lib/users";
 
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]+$/;
 
@@ -45,4 +46,28 @@ export async function POST(request: NextRequest) {
     });
 
     return respondWithStatus("OK");
+}
+
+export async function GET() {
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            return respondWithStatus("UNAUTHORIZED");
+        }
+
+        const profile = await getUserProfile(userId);
+        if (!profile) {
+            // getCurrentUserId가 유저를 조회한 시점에서 도달할 수 없는 구문
+            return respondWithStatus("UNAUTHORIZED");
+        }
+
+        return respondWithStatus("OK", profile);
+    } catch (err) {
+        if (err instanceof ApiError) {
+            return respondWithStatus(err.key, null, err.message);
+        }
+
+        console.error("[/api/users GET] unexpected error:", err);
+        return respondWithStatus("INTERNAL_ERROR");
+    }
 }
