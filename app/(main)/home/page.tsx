@@ -29,21 +29,10 @@ type Monster = {
 };
 
 type UserMonsterItem = {
-  userMonsterId?: string;
-  id?: string;
-
-  monster?: {
-    id?: string;
-    name?: string;
-    rarity?: string;
-    imageUrl?: string;
-    cutoutImageUrl?: string;
-  };
-
-  name?: string;
-  rarity?: string;
-  imageUrl?: string;
-  cutoutImageUrl?: string;
+  userMonsterId: string;
+  name: string;
+  rarity: string;
+  imageUrl: string;
 };
 
 export default function HomePage() {
@@ -72,6 +61,9 @@ export default function HomePage() {
 
   const [loading, setLoading] =
     useState(true);
+
+  const [monsterLoadError, setMonsterLoadError] =
+    useState(false);
 
   const touchStartX =
     useRef<number | null>(null);
@@ -152,48 +144,49 @@ export default function HomePage() {
             !monsterRes.ok ||
             monsterData?.code !== CODE_OK
           ) {
-            setMonsters([]);
-
-            setSpeechText(
-              '주변 사물을 찍어 첫 친구를 찾아볼까요?'
+            console.error(
+              '[홈] 보유 몬스터 조회 실패:',
+              monsterData
             );
 
+            setMonsterLoadError(true);
+            setMonsters([]);
+            setSpeechText(
+              '몬스터 정보를 불러오지 못했어요.'
+            );
             return;
           }
 
-          const list: UserMonsterItem[] =
-            monsterData.data
-              ?.userMonsters ??
-            monsterData.data
-              ?.monsters ??
-            [];
+          const list =
+            monsterData.data?.userMonsters;
 
-          if (
-            !Array.isArray(list) ||
-            list.length === 0
-          ) {
+          if (!Array.isArray(list)) {
+            console.error(
+              '[홈] 예상하지 못한 몬스터 응답 구조:',
+              monsterData
+            );
+
+            setMonsterLoadError(true);
             setMonsters([]);
+            setSpeechText(
+              '몬스터 정보를 불러오지 못했어요.'
+            );
+            return;
+          }
 
+          if (list.length === 0) {
+            setMonsterLoadError(false);
+            setMonsters([]);
             setSpeechText(
               '주변 사물을 찍어 첫 친구를 찾아볼까요?'
             );
-
             return;
           }
 
           const parsedMonsters: Monster[] =
-            list.map(
-              (item, index) => {
-                const monsterInfo =
-                  item.monster ?? item;
-
-                let imageUrl =
-                  monsterInfo
-                    .cutoutImageUrl ||
-                  monsterInfo.imageUrl ||
-                  item.cutoutImageUrl ||
-                  item.imageUrl ||
-                  '';
+            (list as UserMonsterItem[]).map(
+              (item) => {
+                let imageUrl = item.imageUrl;
 
                 if (
                   imageUrl &&
@@ -208,27 +201,15 @@ export default function HomePage() {
                 }
 
                 return {
-                  id:
-                    item.userMonsterId ||
-                    item.id ||
-                    monsterInfo.id ||
-                    String(index),
-
-                  name:
-                    monsterInfo.name ||
-                    item.name ||
-                    '내 몬스터',
-
-                  rarity:
-                    monsterInfo.rarity ||
-                    item.rarity ||
-                    'COMMON',
-
+                  id: item.userMonsterId,
+                  name: item.name,
+                  rarity: item.rarity,
                   imageUrl,
                 };
               }
             );
 
+          setMonsterLoadError(false);
           setMonsters(parsedMonsters);
           setActiveMonsterIndex(0);
 
@@ -241,10 +222,11 @@ export default function HomePage() {
             error
           );
 
+          setMonsterLoadError(true);
           setMonsters([]);
 
           setSpeechText(
-            '주변 사물을 찍어 첫 친구를 찾아볼까요?'
+            '몬스터 정보를 불러오지 못했어요.'
           );
         }
       } finally {
@@ -1004,8 +986,9 @@ export default function HomePage() {
                   text-[#284336]
                 "
               >
-                아직 만난 몬스터가
-                없어요
+                {monsterLoadError
+                  ? '몬스터 정보를 불러오지 못했어요'
+                  : '아직 만난 몬스터가 없어요'}
               </p>
 
               <p
@@ -1018,11 +1001,17 @@ export default function HomePage() {
                   break-keep
                 "
               >
-                주변 사물을 촬영하고
-                걸어서
-                <br />
-                첫 몬스터를
-                만나보세요!
+                {monsterLoadError ? (
+                  <>
+                    잠시 후 다시 시도해 주세요.
+                  </>
+                ) : (
+                  <>
+                    주변 사물을 촬영하고 걸어서
+                    <br />
+                    첫 몬스터를 만나보세요!
+                  </>
+                )}
               </p>
             </button>
           )}
