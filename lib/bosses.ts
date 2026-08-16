@@ -17,14 +17,14 @@ export interface ProcessBattleInput {
   elapsedMs: number;
 }
 
-//활성화된 보스 단건 조회
+// 활성화된 보스 단건 조회
 export async function getActiveBossById(bossId: bigint) {
   const boss = await prisma.boss.findFirst({
     where: { id: bossId, isActive: true },
   });
 
   if (!boss) {
-    throw new ApiError("BOSS_NOT_FOUND", "보스를 찾을 수 없거나 비활성화된 상태입니다.");
+    throw new ApiError("BOSS_NOT_FOUND");
   }
 
   return {
@@ -38,7 +38,7 @@ export async function getActiveBossById(bossId: bigint) {
   };
 }
 
-//보스 전투 결과 검증 및 기록 처리
+// 보스 전투 결과 검증 및 기록 처리
 export async function processBossBattle(input: ProcessBattleInput) {
   const { userId, bossId, userMonsterId, touchCount, criticalCount, elapsedMs } = input;
 
@@ -54,10 +54,10 @@ export async function processBossBattle(input: ProcessBattleInput) {
   ]);
 
   if (!boss) {
-    throw new ApiError("BOSS_NOT_FOUND", "보스를 찾을 수 없습니다.");
+    throw new ApiError("BOSS_NOT_FOUND");
   }
   if (!userMonster) {
-    throw new ApiError("USER_MONSTER_NOT_FOUND", "유저의 몬스터 정보를 찾을 수 없습니다.");
+    throw new ApiError("USER_MONSTER_NOT_FOUND");
   }
 
   // 어뷰징 검증
@@ -65,20 +65,20 @@ export async function processBossBattle(input: ProcessBattleInput) {
 
   // 크리티컬 횟수 초과 검증
   if (criticalCount > touchCount) {
-    throw new ApiError("INVALID_REQUEST", "크리티컬 횟수는 총 터치 횟수를 초과할 수 없습니다.");
+    throw new ApiError("INVALID_REQUEST");
   }
 
   // 제한시간 초과 검증
   if (elapsedMs > TIME_LIMIT_MS + 500) {
-    throw new ApiError("INVALID_REQUEST", "제한 시간을 초과했습니다.");
+    throw new ApiError("INVALID_REQUEST");
   }
 
-  // 경과 시간(elapsedMs) 기준 동적 터치 상한 계산 (초당 최대 15타 + 반올림/네트워크 오차 여유분 3회)
+  // 경과 시간(elapsedMs) 기준 동적 터치 상한 계산
   const effectiveElapsedMs = Math.min(elapsedMs, TIME_LIMIT_MS);
   const maxAllowedTouches = Math.ceil((effectiveElapsedMs / 1000) * 15) + 3;
 
   if (touchCount > maxAllowedTouches) {
-    throw new ApiError("INVALID_REQUEST", "허용된 입력 속도를 초과했습니다.");
+    throw new ApiError("INVALID_REQUEST");
   }
 
   // 스탯 및 속성 상성 데미지 계산
