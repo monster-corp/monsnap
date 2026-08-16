@@ -1,20 +1,22 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 import { getCurrentUserId } from "@/lib/auth";
-import { calculateFinalStats } from "@/lib/stats";
 import { ApiError, respondWithStatus } from "@/lib/api/response";
 import { parseBigIntParam } from "@/lib/api/params";
+import { getActiveBossById, processBossBattle } from "@/lib/bosses";
 
 type RouteContext = { params: Promise<{ bossId: string }> };
 
-const MULTIPLIERS = {
-  WEAK: 1.5,
-  STRONG: 0.5,
-  NORMAL: 1.0,
-};
+// Zod 검증 스키마 (NaN, 음수, null/undefined 사전 차단)
+const battleSubmitSchema = z.object({
+  userMonsterId: z.union([z.string(), z.number()]),
+  touchCount: z.number().int().min(0),
+  criticalCount: z.number().int().min(0),
+  elapsedMs: z.number().int().min(0),
+});
 
 // -------------------------------------------------------------------
-// 1. GET: 보스 정보 조회
+// 1. GET: 활성화된 보스 정보 조회
 // -------------------------------------------------------------------
 export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
@@ -26,38 +28,22 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const { bossId } = await params;
     const parsedBossId = parseBigIntParam(bossId);
     if (parsedBossId === null) {
-      return respondWithStatus("BOSS_ID_REQUIRED");
+      return respondWithStatus("INVALID_REQUEST");
     }
 
-    const boss = await prisma.boss.findUnique({
-      where: { id: parsedBossId },
-    });
-
-    if (!boss) {
-      return respondWithStatus("BOSS_NOT_FOUND");
-    }
-
-    return respondWithStatus("OK", {
-      id: boss.id.toString(),
-      name: boss.name,
-      hp: boss.hp,
-      timeLimitMs: boss.timeLimitMs ?? 30000, // 추가된 보스 제한시간 (기본값 30000ms)
-      weakAttribute: boss.weakAttribute,
-      strongAttribute: boss.strongAttribute,
-      cutoutImageUrl: boss.cutoutImageUrl ?? null,
-    });
+    const bossData = await getActiveBossById(parsedBossId);
+    return respondWithStatus("OK", bossData);
   } catch (err) {
     if (err instanceof ApiError) {
       return respondWithStatus(err.key, null, err.message);
     }
-
     console.error("[/api/bosses/[bossId] GET] unexpected error:", err);
     return respondWithStatus("INTERNAL_ERROR");
   }
 }
 
 // -------------------------------------------------------------------
-// 2. POST: 전투 종료 및 결과 처리 (단발성 기록)
+// 2. POST: 전투 종료 및 결과 처리
 // -------------------------------------------------------------------
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
@@ -69,127 +55,44 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const { bossId } = await params;
     const parsedBossId = parseBigIntParam(bossId);
     if (parsedBossId === null) {
-      return respondWithStatus("BOSS_ID_REQUIRED");
+      return respondWithStatus("INVALID_REQUEST");
     }
 
-    const body = await req.json();
-    const { userMonsterId, touchCount, criticalCount, elapsedMs } = body;
+    // JSON 파싱 예외 처리
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return respondWithStatus("INVALID_REQUEST");
+    }
 
-    const parsedMonsterId =
-      userMonsterId !== undefined && userMonsterId !== null
-        ? parseBigIntParam(String(userMonsterId))
-        : null;
+    // Zod 유효성 검증
+    const parsed = battleSubmitSchema.safeParse(body);
+    if (!parsed.success) {
+      return respondWithStatus("INVALID_REQUEST");
+    }
+
+    const { userMonsterId, touchCount, criticalCount, elapsedMs } = parsed.data;
+    const parsedMonsterId = parseBigIntParam(String(userMonsterId));
 
     if (parsedMonsterId === null) {
       return respondWithStatus("INVALID_REQUEST");
     }
 
-    // 보스(isActive) 및 유저 몬스터 소유권 확인
-    const [boss, userMonster] = await Promise.all([
-      prisma.boss.findFirst({
-        where: { id: parsedBossId, isActive: true },
-      }),
-      prisma.userMonster.findFirst({
-        where: { id: parsedMonsterId, userId: BigInt(userId) },
-        include: { monster: true },
-      }),
-    ]);
-
-    if (!boss) {
-      return respondWithStatus("BOSS_NOT_FOUND");
-    }
-
-    if (!userMonster) {
-      return respondWithStatus("USER_MONSTER_NOT_FOUND");
-    }
-
-    // 어뷰징 검증 (DB에 설정된 timeLimitMs 적용)
-    const touches = Number(touchCount ?? 0);
-    const criticals = Number(criticalCount ?? 0);
-    const elapsed = Number(elapsedMs ?? 0);
-    const TIME_LIMIT_MS = boss.timeLimitMs ?? 30000;
-
-    if (criticals > touches) {
-      return respondWithStatus("INVALID_REQUEST");
-    }
-
-    if (elapsed > TIME_LIMIT_MS + 500) {
-      return respondWithStatus("INVALID_REQUEST");
-    }
-
-    const maxAllowedTouches = Math.ceil((TIME_LIMIT_MS / 1000) * 15);
-    if (touches > maxAllowedTouches) {
-      return respondWithStatus("INVALID_REQUEST");
-    }
-
-    // 스탯 및 속성 상성 배율 계산
-    const finalStats = calculateFinalStats(
-      {
-        baseHp: userMonster.monster.baseHp,
-        baseAttack: userMonster.monster.baseAttack,
-        baseDefense: userMonster.monster.baseDefense,
-        baseSpeed: userMonster.monster.baseSpeed,
-      },
-      {
-        ivHp: userMonster.ivHp,
-        ivAttack: userMonster.ivAttack,
-        ivDefense: userMonster.ivDefense,
-        ivSpeed: userMonster.ivSpeed,
-      }
-    );
-
-    let damageMultiplier = MULTIPLIERS.NORMAL;
-    const monsterMaterial = userMonster.monster.material;
-
-    if (boss.weakAttribute && monsterMaterial === boss.weakAttribute) {
-      damageMultiplier = MULTIPLIERS.WEAK;
-    } else if (boss.strongAttribute && monsterMaterial === boss.strongAttribute) {
-      damageMultiplier = MULTIPLIERS.STRONG;
-    }
-
-    // 데미지 서버 재계산 및 승리 판정
-    const normalTouches = touches - criticals;
-    const baseDamagePerHit = finalStats.attack * damageMultiplier;
-    const totalDamage = Math.round(
-      normalTouches * baseDamagePerHit + criticals * (baseDamagePerHit * 1.5)
-    );
-
-    const bossHpRemaining = Math.max(0, boss.hp - totalDamage);
-    const isCleared = bossHpRemaining === 0 && elapsed <= TIME_LIMIT_MS;
-
-    // 시작 시간 역산
-    const startedAt = new Date(Date.now() - elapsed);
-
-    // 변경된 스키마에 맞춰 battle_logs 저장
-    const battleLog = await prisma.battleLog.create({
-      data: {
-        userId: BigInt(userId),
-        bossId: boss.id,
-        userMonsterId: userMonster.id,
-        battleType: "BOSS_TIMED",
-        damageMultiplier,
-        touchCount: touches,
-        criticalCount: criticals,
-        damageDealt: totalDamage,
-        bossHpRemaining,
-        elapsedMs: elapsed,
-        isCleared,
-        startedAt,
-      },
+    const result = await processBossBattle({
+      userId,
+      bossId: parsedBossId,
+      userMonsterId: parsedMonsterId,
+      touchCount,
+      criticalCount,
+      elapsedMs,
     });
 
-    return respondWithStatus("OK", {
-      battleLogId: battleLog.id.toString(),
-      isCleared,
-      damageDealt: totalDamage,
-      bossHpRemaining,
-      damageMultiplier,
-    });
+    return respondWithStatus("OK", result);
   } catch (err) {
     if (err instanceof ApiError) {
       return respondWithStatus(err.key, null, err.message);
     }
-
     console.error("[/api/bosses/[bossId] POST] unexpected error:", err);
     return respondWithStatus("INTERNAL_ERROR");
   }

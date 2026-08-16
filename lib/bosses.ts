@@ -1,0 +1,144 @@
+import { prisma } from "@/lib/prisma";
+import { calculateFinalStats } from "@/lib/stats";
+import { ApiError } from "@/lib/api/response";
+
+const MULTIPLIERS = {
+  WEAK: 1.5,
+  STRONG: 0.5,
+  NORMAL: 1.0,
+};
+
+export interface ProcessBattleInput {
+  userId: bigint | string;
+  bossId: bigint;
+  userMonsterId: bigint;
+  touchCount: number;
+  criticalCount: number;
+  elapsedMs: number;
+}
+
+//활성화된 보스 단건 조회
+export async function getActiveBossById(bossId: bigint) {
+  const boss = await prisma.boss.findFirst({
+    where: { id: bossId, isActive: true },
+  });
+
+  if (!boss) {
+    throw new ApiError("BOSS_NOT_FOUND", "보스를 찾을 수 없거나 비활성화된 상태입니다.");
+  }
+
+  return {
+    id: boss.id.toString(),
+    name: boss.name,
+    hp: boss.hp,
+    timeLimitMs: boss.timeLimitMs ?? 30000,
+    weakAttribute: boss.weakAttribute,
+    strongAttribute: boss.strongAttribute,
+    cutoutImageUrl: boss.cutoutImageUrl ?? null,
+  };
+}
+
+//보스 전투 결과 검증 및 기록 처리
+export async function processBossBattle(input: ProcessBattleInput) {
+  const { userId, bossId, userMonsterId, touchCount, criticalCount, elapsedMs } = input;
+
+  // 보스 및 유저 몬스터 조회
+  const [boss, userMonster] = await Promise.all([
+    prisma.boss.findFirst({
+      where: { id: bossId, isActive: true },
+    }),
+    prisma.userMonster.findFirst({
+      where: { id: userMonsterId, userId: BigInt(userId) },
+      include: { monster: true },
+    }),
+  ]);
+
+  if (!boss) {
+    throw new ApiError("BOSS_NOT_FOUND", "보스를 찾을 수 없습니다.");
+  }
+  if (!userMonster) {
+    throw new ApiError("USER_MONSTER_NOT_FOUND", "유저의 몬스터 정보를 찾을 수 없습니다.");
+  }
+
+  // 어뷰징 검증
+  const TIME_LIMIT_MS = boss.timeLimitMs ?? 30000;
+
+  // 크리티컬 횟수 초과 검증
+  if (criticalCount > touchCount) {
+    throw new ApiError("INVALID_REQUEST", "크리티컬 횟수는 총 터치 횟수를 초과할 수 없습니다.");
+  }
+
+  // 제한시간 초과 검증
+  if (elapsedMs > TIME_LIMIT_MS + 500) {
+    throw new ApiError("INVALID_REQUEST", "제한 시간을 초과했습니다.");
+  }
+
+  // 경과 시간(elapsedMs) 기준 동적 터치 상한 계산 (초당 최대 15타 + 반올림/네트워크 오차 여유분 3회)
+  const effectiveElapsedMs = Math.min(elapsedMs, TIME_LIMIT_MS);
+  const maxAllowedTouches = Math.ceil((effectiveElapsedMs / 1000) * 15) + 3;
+
+  if (touchCount > maxAllowedTouches) {
+    throw new ApiError("INVALID_REQUEST", "허용된 입력 속도를 초과했습니다.");
+  }
+
+  // 스탯 및 속성 상성 데미지 계산
+  const finalStats = calculateFinalStats(
+    {
+      baseHp: userMonster.monster.baseHp,
+      baseAttack: userMonster.monster.baseAttack,
+      baseDefense: userMonster.monster.baseDefense,
+      baseSpeed: userMonster.monster.baseSpeed,
+    },
+    {
+      ivHp: userMonster.ivHp,
+      ivAttack: userMonster.ivAttack,
+      ivDefense: userMonster.ivDefense,
+      ivSpeed: userMonster.ivSpeed,
+    }
+  );
+
+  let damageMultiplier = MULTIPLIERS.NORMAL;
+  const monsterMaterial = userMonster.monster.material;
+
+  if (boss.weakAttribute && monsterMaterial === boss.weakAttribute) {
+    damageMultiplier = MULTIPLIERS.WEAK;
+  } else if (boss.strongAttribute && monsterMaterial === boss.strongAttribute) {
+    damageMultiplier = MULTIPLIERS.STRONG;
+  }
+
+  const normalTouches = touchCount - criticalCount;
+  const baseDamagePerHit = finalStats.attack * damageMultiplier;
+  const totalDamage = Math.round(
+    normalTouches * baseDamagePerHit + criticalCount * (baseDamagePerHit * 1.5)
+  );
+
+  const bossHpRemaining = Math.max(0, boss.hp - totalDamage);
+  const isCleared = bossHpRemaining === 0 && elapsedMs <= TIME_LIMIT_MS;
+  const startedAt = new Date(Date.now() - elapsedMs);
+
+  // 전투 기록 저장
+  const battleLog = await prisma.battleLog.create({
+    data: {
+      userId: BigInt(userId),
+      bossId: boss.id,
+      userMonsterId: userMonster.id,
+      battleType: "BOSS_TIMED",
+      damageMultiplier,
+      touchCount,
+      criticalCount,
+      damageDealt: totalDamage,
+      bossHpRemaining,
+      elapsedMs,
+      isCleared,
+      startedAt,
+    },
+  });
+
+  return {
+    battleLogId: battleLog.id.toString(),
+    isCleared,
+    damageDealt: totalDamage,
+    bossHpRemaining,
+    damageMultiplier,
+  };
+}
