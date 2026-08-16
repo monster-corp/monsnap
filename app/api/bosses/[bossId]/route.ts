@@ -41,6 +41,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       id: boss.id.toString(),
       name: boss.name,
       hp: boss.hp,
+      timeLimitMs: boss.timeLimitMs ?? 30000, // 추가된 보스 제한시간 (기본값 30000ms)
       weakAttribute: boss.weakAttribute,
       strongAttribute: boss.strongAttribute,
       cutoutImageUrl: boss.cutoutImageUrl ?? null,
@@ -102,11 +103,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return respondWithStatus("USER_MONSTER_NOT_FOUND");
     }
 
-    // 어뷰징 검증
+    // 어뷰징 검증 (DB에 설정된 timeLimitMs 적용)
     const touches = Number(touchCount ?? 0);
     const criticals = Number(criticalCount ?? 0);
     const elapsed = Number(elapsedMs ?? 0);
-    const TIME_LIMIT_MS = 30000;
+    const TIME_LIMIT_MS = boss.timeLimitMs ?? 30000;
 
     if (criticals > touches) {
       return respondWithStatus("INVALID_REQUEST");
@@ -156,18 +157,23 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const bossHpRemaining = Math.max(0, boss.hp - totalDamage);
     const isCleared = bossHpRemaining === 0 && elapsed <= TIME_LIMIT_MS;
 
-    // 시작 시간 역산 및 battle_logs 저장
+    // 시작 시간 역산
     const startedAt = new Date(Date.now() - elapsed);
 
+    // 변경된 스키마에 맞춰 battle_logs 저장
     const battleLog = await prisma.battleLog.create({
       data: {
         userId: BigInt(userId),
         bossId: boss.id,
         userMonsterId: userMonster.id,
-        damageDealt: totalDamage,
+        battleType: "BOSS_TIMED",
         damageMultiplier,
-        isCritical: criticals > 0,
+        touchCount: touches,
+        criticalCount: criticals,
+        damageDealt: totalDamage,
         bossHpRemaining,
+        elapsedMs: elapsed,
+        isCleared,
         startedAt,
       },
     });
