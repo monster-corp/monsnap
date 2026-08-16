@@ -1,8 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Camera, Ghost, ArrowRight } from 'lucide-react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type TouchEvent,
+} from 'react';
+import {
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Ghost,
+  UserRound,
+} from 'lucide-react';
 import Link from 'next/link';
+
+const CODE_OK = 20000;
+const SWIPE_THRESHOLD = 45;
+
+// 상단 종이 영역 높이
+const TOP_PAPER_HEIGHT = '106px';
 
 type Monster = {
   id: string;
@@ -11,239 +28,1044 @@ type Monster = {
   imageUrl?: string;
 };
 
-export default function HomePage() {
-  const [nickname, setNickname] = useState<string>('새내기 탐험가');
-  const [partnerMonster, setPartnerMonster] = useState<Monster | null>(null);
-  const [remainingSlots, setRemainingSlots] = useState<number>(3);
-  const [speechText, setSpeechText] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+type UserMonsterItem = {
+  userMonsterId?: string;
+  id?: string;
 
+  monster?: {
+    id?: string;
+    name?: string;
+    rarity?: string;
+    imageUrl?: string;
+    cutoutImageUrl?: string;
+  };
+
+  name?: string;
+  rarity?: string;
+  imageUrl?: string;
+  cutoutImageUrl?: string;
+};
+
+export default function HomePage() {
+  // /api/users 연동 전/실패 시 fallback
+  const [nickname, setNickname] =
+    useState('새내기 탐험가');
+
+  const [monsters, setMonsters] =
+    useState<Monster[]>([]);
+
+  const [
+    activeMonsterIndex,
+    setActiveMonsterIndex,
+  ] = useState(0);
+
+  const [scanCharges, setScanCharges] =
+    useState(0);
+
+  const [
+    maxScanCharges,
+    setMaxScanCharges,
+  ] = useState(5);
+
+  const [speechText, setSpeechText] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const touchStartX =
+    useRef<number | null>(null);
+
+  const touchEndX =
+    useRef<number | null>(null);
+
+  const activeMonster =
+    monsters.length > 0
+      ? monsters[activeMonsterIndex]
+      : null;
+
+  // ─────────────────────
+  // 메인 데이터 조회
+  // ─────────────────────
   useEffect(() => {
     async function fetchLobbyData() {
       try {
-        // 1. 유저 정보 조회
+        // ─────────────────────
+        // 1. 현재 사용자 정보
+        // nickname + scanCharge
+        // ─────────────────────
         try {
-          const userRes = await fetch('/api/users/me');
-          const userData = await userRes.json().catch(() => null);
-          if (userData?.code === 20000 && userData.data?.nickname) {
-            setNickname(userData.data.nickname);
-          }
-        } catch {}
+          const userRes = await fetch(
+            '/api/users'
+          );
 
-        // 2. 알 슬롯 조회
+          const userData = await userRes
+            .json()
+            .catch(() => null);
+
+          if (
+            userRes.ok &&
+            userData?.code === CODE_OK
+          ) {
+            setNickname(
+              userData.data?.nickname ??
+                '새내기 탐험가'
+            );
+
+            setScanCharges(
+              userData.data?.scanCharge
+                ?.charges ?? 0
+            );
+
+            setMaxScanCharges(
+              userData.data?.scanCharge
+                ?.maxCharges ?? 5
+            );
+
+          } else {
+            console.error(
+              '[홈] 사용자 정보 조회 실패:',
+              userData
+            );
+          }
+        } catch (error) {
+          console.error(
+            '[홈] 사용자 정보 조회 실패:',
+            error
+          );
+        }
+
+        // ─────────────────────
+        // 2. 보유 몬스터 전체 조회
+        // ─────────────────────
         try {
-          const eggRes = await fetch('/api/eggs');
-          const eggData = await eggRes.json().catch(() => null);
-          if (eggData?.code === 20000) {
-            const currentEggsCount = eggData.data?.eggs?.length ?? 0;
-            setRemainingSlots(Math.max(0, 3 - currentEggsCount));
-          }
-        } catch {}
+          const monsterRes = await fetch(
+            '/api/user-monsters?sort=dexId&order=asc'
+          );
 
-        // 3. 보유 몬스터 조회 (유력 엔드포인트들 순차 시도)
-        let monsterData: any = null;
+          const monsterData =
+            await monsterRes
+              .json()
+              .catch(() => null);
 
-        // 시도 1: /api/user-monsters
-        const res1 = await fetch('/api/user-monsters').catch(() => null);
-        if (res1?.ok) {
-          monsterData = await res1.json().catch(() => null);
-        }
+          if (
+            !monsterRes.ok ||
+            monsterData?.code !== CODE_OK
+          ) {
+            setMonsters([]);
 
-        // 시도 2: /api/monsters (기존 경로)
-        if (!monsterData || monsterData.code !== 20000) {
-          const res2 = await fetch('/api/monsters').catch(() => null);
-          if (res2?.ok) {
-            monsterData = await res2.json().catch(() => null);
-          }
-        }
+            setSpeechText(
+              '주변 사물을 찍어 첫 친구를 찾아볼까요?'
+            );
 
-        console.log('📦 [홈 로비] 최종 받아온 보유 몬스터 응답:', monsterData);
-
-        // 응답 배열 추출
-        const list: any[] = 
-          monsterData?.data?.userMonsters ?? 
-          monsterData?.data?.monsters ?? 
-          monsterData?.data?.items ??
-          (Array.isArray(monsterData?.data) ? monsterData.data : []);
-
-        console.log('🔍 [홈 로비] 추출된 몬스터 리스트:', list);
-
-        if (Array.isArray(list) && list.length > 0) {
-          const item = list[0];
-          const mInfo = item.monster ? item.monster : item;
-          
-          let rawImg = 
-            mInfo.imageUrl || 
-            mInfo.image_url || 
-            item.imageUrl || 
-            item.image_url || 
-            mInfo.cutoutImageUrl ||
-            '';
-
-          // 상대 경로 보정 (ex: "images/..." -> "/images/...")
-          if (rawImg && !rawImg.startsWith('http') && !rawImg.startsWith('/')) {
-            rawImg = `/${rawImg}`;
+            return;
           }
 
-          const parsedName = mInfo.name || item.name || '내 몬스터';
+          const list: UserMonsterItem[] =
+            monsterData.data
+              ?.userMonsters ??
+            monsterData.data
+              ?.monsters ??
+            [];
 
-          console.log('🎯 [홈 로비] 최종 파트너 지정:', { name: parsedName, imageUrl: rawImg });
+          if (
+            !Array.isArray(list) ||
+            list.length === 0
+          ) {
+            setMonsters([]);
 
-          setPartnerMonster({
-            id: item.id || mInfo.id || '1',
-            name: parsedName,
-            imageUrl: rawImg,
-            rarity: mInfo.rarity || item.rarity || 'COMMON',
-          });
-          setSpeechText('오늘도 함께 산책하며 새로운 친구를 찾아볼까요? ✨');
-        } else {
-          setPartnerMonster(null);
-          setSpeechText('주변 사물을 찍어 첫 친구를 찾아볼까요? 🔍');
+            setSpeechText(
+              '주변 사물을 찍어 첫 친구를 찾아볼까요?'
+            );
+
+            return;
+          }
+
+          const parsedMonsters: Monster[] =
+            list.map(
+              (item, index) => {
+                const monsterInfo =
+                  item.monster ?? item;
+
+                let imageUrl =
+                  monsterInfo
+                    .cutoutImageUrl ||
+                  monsterInfo.imageUrl ||
+                  item.cutoutImageUrl ||
+                  item.imageUrl ||
+                  '';
+
+                if (
+                  imageUrl &&
+                  !imageUrl.startsWith(
+                    'http'
+                  ) &&
+                  !imageUrl.startsWith(
+                    '/'
+                  )
+                ) {
+                  imageUrl = `/${imageUrl}`;
+                }
+
+                return {
+                  id:
+                    item.userMonsterId ||
+                    item.id ||
+                    monsterInfo.id ||
+                    String(index),
+
+                  name:
+                    monsterInfo.name ||
+                    item.name ||
+                    '내 몬스터',
+
+                  rarity:
+                    monsterInfo.rarity ||
+                    item.rarity ||
+                    'COMMON',
+
+                  imageUrl,
+                };
+              }
+            );
+
+          setMonsters(parsedMonsters);
+          setActiveMonsterIndex(0);
+
+          setSpeechText(
+            '오늘도 같이 탐험해볼까요?'
+          );
+        } catch (error) {
+          console.error(
+            '[홈] 보유 몬스터 조회 실패:',
+            error
+          );
+
+          setMonsters([]);
+
+          setSpeechText(
+            '주변 사물을 찍어 첫 친구를 찾아볼까요?'
+          );
         }
-      } catch (err) {
-        console.error('로비 데이터 로드 에러:', err);
-        setPartnerMonster(null);
-        setSpeechText('주변 사물을 찍어 첫 친구를 찾아볼까요? 🔍');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLobbyData();
+    void fetchLobbyData();
   }, []);
 
-  const handleTouchCenter = () => {
-    if (partnerMonster) {
-      const dialogues = [
-        '주변 사물을 촬영하면 친구가 늘어나요! 🔍',
-        '걸을수록 사진이 선명하게 인화돼요. 👟',
-        '오늘 날씨가 산책하기 딱 좋네요! 🌿',
-        '멋진 사물을 발견하면 언제든 알려주세요! 📸',
-      ];
-      setSpeechText(dialogues[Math.floor(Math.random() * dialogues.length)]);
-    } else {
-      const emptyDialogues = [
-        '주변 사물을 찍어 첫 친구를 찾아볼까요? 🔍',
-        '책상 위의 컵, 펜, 식물을 카메라에 담아보세요! ☕',
-        '사물을 촬영하고 걸어서 알을 부화시켜보세요! 🥚',
-      ];
-      setSpeechText(emptyDialogues[Math.floor(Math.random() * emptyDialogues.length)]);
+  // 몬스터가 바뀌면 기본 대사
+  useEffect(() => {
+    if (monsters.length > 0) {
+      setSpeechText(
+        '오늘도 같이 탐험해볼까요?'
+      );
     }
+  }, [
+    activeMonsterIndex,
+    monsters.length,
+  ]);
+
+  // ─────────────────────
+  // 이전 몬스터
+  // ─────────────────────
+  const showPreviousMonster = () => {
+    if (monsters.length <= 1) return;
+
+    setActiveMonsterIndex((prev) =>
+      prev === 0
+        ? monsters.length - 1
+        : prev - 1
+    );
+  };
+
+  // ─────────────────────
+  // 다음 몬스터
+  // ─────────────────────
+  const showNextMonster = () => {
+    if (monsters.length <= 1) return;
+
+    setActiveMonsterIndex((prev) =>
+      prev === monsters.length - 1
+        ? 0
+        : prev + 1
+    );
+  };
+
+  // ─────────────────────
+  // 모바일 좌우 스와이프
+  // ─────────────────────
+  const handleTouchStart = (
+    event: TouchEvent<HTMLDivElement>
+  ) => {
+    touchStartX.current =
+      event.touches[0]?.clientX ??
+      null;
+
+    touchEndX.current = null;
+  };
+
+  const handleTouchMove = (
+    event: TouchEvent<HTMLDivElement>
+  ) => {
+    touchEndX.current =
+      event.touches[0]?.clientX ??
+      null;
+  };
+
+  const handleTouchEnd = () => {
+    if (
+      touchStartX.current === null ||
+      touchEndX.current === null
+    ) {
+      touchStartX.current = null;
+      touchEndX.current = null;
+      return;
+    }
+
+    const distance =
+      touchStartX.current -
+      touchEndX.current;
+
+    if (
+      Math.abs(distance) >=
+      SWIPE_THRESHOLD
+    ) {
+      if (distance > 0) {
+        showNextMonster();
+      } else {
+        showPreviousMonster();
+      }
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
+  // ─────────────────────
+  // 말풍선 터치 시 대사 변경
+  // ─────────────────────
+  const handleTouchCenter = () => {
+    if (activeMonster) {
+      const dialogues = [
+        '오늘은 어떤 사물을 만나게 될까요?',
+        '걸을수록 사진이 선명하게 인화돼요.',
+        '새로운 친구를 만나러 가볼까요?',
+        '멋진 사물을 발견하면 꼭 보여주세요!',
+      ];
+
+      setSpeechText(
+        dialogues[
+          Math.floor(
+            Math.random() *
+              dialogues.length
+          )
+        ]
+      );
+
+      return;
+    }
+
+    const emptyDialogues = [
+      '주변 사물을 찍어 첫 친구를 찾아볼까요?',
+      '책상 위 물건부터 촬영해보는 건 어때요?',
+      '사물을 촬영하고 걸어서 알을 부화시켜보세요!',
+    ];
+
+    setSpeechText(
+      emptyDialogues[
+        Math.floor(
+          Math.random() *
+            emptyDialogues.length
+        )
+      ]
+    );
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-4 pb-20 bg-gradient-to-b from-[#F2F6F3] via-[#E8F0EA] to-[#DCE8DF] min-h-[calc(100svh-3.5rem)] relative overflow-hidden select-none">
-      
-      {/* ───────── 1. 상단 프로필 & 슬롯 바 ───────── */}
-      <header className="flex items-center justify-between z-10 pt-1 shrink-0">
-        <div className="flex items-center gap-2 bg-white/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/70 shadow-sm">
-          <div className="w-6 h-6 rounded-full bg-[#1F4B3C] text-white flex items-center justify-center font-black text-[10px] shadow-sm">
-            Lv.1
+    <div
+      className="
+        h-full
+        w-full
+        relative
+        overflow-hidden
+        select-none
+        bg-[#E7E0D8]
+      "
+    >
+      {/* ═══════════════════════════════
+          상단 종이 영역
+      ═══════════════════════════════ */}
+      <div
+        className="
+          absolute
+          top-0
+          left-0
+          right-0
+          z-[5]
+          bg-[#E7E0D8]
+          border-b
+          border-[#C8BFB5]
+        "
+        style={{
+          height: TOP_PAPER_HEIGHT,
+        }}
+      />
+
+      {/* ═══════════════════════════════
+          몬스터 이미지 영역
+      ═══════════════════════════════ */}
+      {activeMonster?.imageUrl ? (
+        <>
+          {/* 흐린 보조 배경 */}
+          <div
+            className="
+              absolute
+              left-0
+              right-0
+              bottom-0
+              overflow-hidden
+            "
+            style={{
+              top: TOP_PAPER_HEIGHT,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={
+                activeMonster.imageUrl
+              }
+              alt=""
+              aria-hidden="true"
+              className="
+                w-full
+                h-full
+                object-cover
+                scale-[1.18]
+                blur-2xl
+                opacity-35
+              "
+            />
           </div>
-          <span className="text-xs font-black text-[#1B1B1B]">{nickname}</span>
+
+          {/* 실제 몬스터 이미지 */}
+          <div
+            className="
+              absolute
+              left-0
+              right-0
+              bottom-0
+              touch-pan-y
+              overflow-hidden
+            "
+            style={{
+              top: TOP_PAPER_HEIGHT,
+            }}
+            onTouchStart={
+              handleTouchStart
+            }
+            onTouchMove={
+              handleTouchMove
+            }
+            onTouchEnd={
+              handleTouchEnd
+            }
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={
+                activeMonster.id
+              }
+              src={
+                activeMonster.imageUrl
+              }
+              alt={
+                activeMonster.name
+              }
+              className="
+                w-full
+                h-full
+                object-cover
+                scale-[1.18]
+                transition-transform
+                duration-300
+                ease-out
+              "
+            />
+          </div>
+
+          {/* 가독성 그라데이션 */}
+          <div
+            className="
+              pointer-events-none
+              absolute
+              left-0
+              right-0
+              bottom-0
+              bg-gradient-to-b
+              from-black/5
+              via-transparent
+              to-black/45
+            "
+            style={{
+              top: TOP_PAPER_HEIGHT,
+            }}
+          />
+        </>
+      ) : (
+        <>
+          {/* 몬스터가 없는 경우 */}
+          <div
+            className="
+              absolute
+              left-0
+              right-0
+              bottom-0
+              bg-gradient-to-b
+              from-[#F4F8F5]
+              via-[#E9F1EB]
+              to-[#D8E5DC]
+            "
+            style={{
+              top: TOP_PAPER_HEIGHT,
+            }}
+          />
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -left-24
+              top-32
+              w-80
+              h-80
+              rounded-full
+              bg-white/40
+              blur-3xl
+            "
+          />
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -right-24
+              bottom-10
+              w-80
+              h-80
+              rounded-full
+              bg-[#AAC6B2]/30
+              blur-3xl
+            "
+          />
+        </>
+      )}
+
+      {/* ═══════════════════════════════
+          상단 정보
+      ═══════════════════════════════ */}
+      <header
+        className="
+          absolute
+          top-0
+          left-0
+          right-0
+          z-20
+          h-[106px]
+          px-4
+          pt-4
+          flex
+          items-start
+          justify-between
+        "
+      >
+        {/* 프로필 */}
+        <div
+          className="
+            flex
+            items-center
+            gap-2
+            bg-[#F3EEE8]
+            pl-2
+            pr-3.5
+            py-1.5
+            rounded-full
+            border
+            border-[#C8BFB5]
+            shadow-[0_2px_7px_rgba(45,38,30,0.10)]
+          "
+        >
+          <div
+            className="
+              w-8
+              h-8
+              rounded-full
+              bg-[#1F4B3C]
+              flex
+              items-center
+              justify-center
+              shadow-sm
+            "
+          >
+            <UserRound
+              size={16}
+              className="text-[#F4F0EA]"
+            />
+          </div>
+
+          <span
+            className="
+              text-xs
+              font-black
+              text-[#31473C]
+              max-w-[110px]
+              truncate
+            "
+          >
+            {nickname}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/70 shadow-sm">
-          <Camera size={13} className="text-[#1F4B3C]" />
-          <span className="text-xs font-bold text-[#1B1B1B]">스캔 슬롯</span>
-          <span className="text-xs font-black text-[#1F4B3C]">{remainingSlots}/3</span>
-        </div>
+        {/* 스캔 가능 횟수 */}
+        <Link
+          href="/scans"
+          className="
+            flex
+            items-center
+            gap-2
+            bg-[#F3EEE8]
+            pl-3
+            pr-3.5
+            py-2
+            rounded-full
+            border
+            border-[#C8BFB5]
+            shadow-[0_2px_7px_rgba(45,38,30,0.10)]
+            active:scale-95
+            transition-transform
+          "
+        >
+          <Camera
+            size={14}
+            className="text-[#456A58]"
+          />
+
+          <div
+            className="
+              flex
+              flex-col
+              items-start
+              leading-none
+            "
+          >
+            <div
+              className="
+                flex
+                items-center
+                gap-2
+              "
+            >
+              <span
+                className="
+                  text-[11px]
+                  font-bold
+                  text-[#66776E]
+                "
+              >
+                스캔 가능
+              </span>
+
+              <span
+                className="
+                  text-sm
+                  font-black
+                  text-[#1F4B3C]
+                "
+              >
+                {scanCharges}/
+                {maxScanCharges}
+              </span>
+            </div>
+
+          </div>
+        </Link>
       </header>
 
-      {/* ───────── 2. 중앙 메인 영역 ───────── */}
-      <main className="flex-1 flex flex-col items-center justify-center my-auto relative w-full">
-        
-        {/* 말풍선 */}
-        <div 
-          onClick={handleTouchCenter}
-          className="relative mb-6 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.06)] border border-white/90 max-w-[260px] text-center cursor-pointer active:scale-95 transition-all"
+      {/* ═══════════════════════════════
+          메인 UI
+      ═══════════════════════════════ */}
+      <div
+        className="
+          relative
+          z-10
+          h-full
+          w-full
+          flex
+          flex-col
+          pointer-events-none
+        "
+        style={{
+          paddingTop:
+            TOP_PAPER_HEIGHT,
+        }}
+      >
+        <main
+          className="
+            flex-1
+            min-h-0
+            flex
+            flex-col
+            justify-end
+            items-center
+            px-4
+            pb-4
+            pointer-events-auto
+          "
         >
-          <p className="text-xs font-bold text-[#1B1B1B] leading-relaxed break-keep">
-            {speechText}
-          </p>
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-white/95" />
-        </div>
-
-        {loading ? (
-          <div className="w-48 h-48 flex items-center justify-center">
-            <div className="w-7 h-7 border-2 border-[#1F4B3C] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : partnerMonster ? (
-          /* [보유 몬스터 있을 때] - 폴라로이드 테두리 잘라낸 카드형 */
-          <div
-            onClick={handleTouchCenter}
-            className="relative cursor-pointer flex flex-col items-center active:scale-95 transition-transform"
-          >
-            <div className="relative flex flex-col items-center">
-              <div className="w-52 h-52 rounded-3xl bg-white p-2.5 shadow-[0_16px_32px_rgba(31,75,60,0.12)] border border-white/80 animate-floating">
-                <div className="w-full h-full rounded-2xl overflow-hidden bg-[#E6ECE8] relative shadow-inner flex items-center justify-center">
-                  {partnerMonster.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={partnerMonster.imageUrl}
-                      alt={partnerMonster.name}
-                      className="w-full h-full object-cover scale-[1.18]"
+          {loading ? (
+            <div
+              className="
+                flex-1
+                flex
+                items-center
+                justify-center
+              "
+            >
+              <div
+                className="
+                  w-8
+                  h-8
+                  border-2
+                  border-white
+                  border-t-transparent
+                  rounded-full
+                  animate-spin
+                  drop-shadow-md
+                "
+              />
+            </div>
+          ) : activeMonster ? (
+            <div
+              className="
+                w-full
+                flex
+                flex-col
+                items-center
+                relative
+              "
+            >
+              {/* 좌우 몬스터 전환 */}
+              {monsters.length >
+                1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={
+                      showPreviousMonster
+                    }
+                    aria-label="이전 몬스터"
+                    className="
+                      absolute
+                      left-0
+                      top-[-205px]
+                      w-10
+                      h-10
+                      rounded-full
+                      bg-[#1A2621]/75
+                      backdrop-blur-md
+                      border
+                      border-white/15
+                      text-white
+                      flex
+                      items-center
+                      justify-center
+                      shadow-[0_4px_12px_rgba(0,0,0,0.18)]
+                      active:scale-90
+                      transition-all
+                    "
+                  >
+                    <ChevronLeft
+                      size={20}
                     />
-                  ) : (
-                    <Ghost size={52} className="text-[#3E7A5C] animate-pulse" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={
+                      showNextMonster
+                    }
+                    aria-label="다음 몬스터"
+                    className="
+                      absolute
+                      right-0
+                      top-[-205px]
+                      w-10
+                      h-10
+                      rounded-full
+                      bg-[#1A2621]/75
+                      backdrop-blur-md
+                      border
+                      border-white/15
+                      text-white
+                      flex
+                      items-center
+                      justify-center
+                      shadow-[0_4px_12px_rgba(0,0,0,0.18)]
+                      active:scale-90
+                      transition-all
+                    "
+                  >
+                    <ChevronRight
+                      size={20}
+                    />
+                  </button>
+                </>
+              )}
+
+              {/* 말풍선 */}
+              <button
+                type="button"
+                onClick={
+                  handleTouchCenter
+                }
+                className="
+                  relative
+                  max-w-[270px]
+                  mb-2
+                  px-4
+                  py-2.5
+                  rounded-2xl
+                  bg-white/90
+                  backdrop-blur-lg
+                  border
+                  border-white/70
+                  shadow-[0_5px_16px_rgba(0,0,0,0.08)]
+                  active:scale-95
+                  transition-transform
+                "
+              >
+                {/* 몬스터 방향을 가리키는 꼬리 */}
+                <span
+                  className="
+                    absolute
+                    left-1/2
+                    -top-[8px]
+                    -translate-x-1/2
+                    w-0
+                    h-0
+                    border-l-[7px]
+                    border-l-transparent
+                    border-r-[7px]
+                    border-r-transparent
+                    border-b-[8px]
+                    border-b-white/90
+                  "
+                />
+
+                <p
+                  className="
+                    text-xs
+                    font-bold
+                    text-[#263B31]
+                    leading-relaxed
+                    text-center
+                    break-keep
+                  "
+                >
+                  {speechText}
+                </p>
+              </button>
+
+              {/* 인디케이터 */}
+              {monsters.length >
+                1 && (
+                <div
+                  className="
+                    flex
+                    items-center
+                    justify-center
+                    gap-1.5
+                    mt-2
+                  "
+                >
+                  {monsters.map(
+                    (
+                      monster,
+                      index
+                    ) => (
+                      <button
+                        key={
+                          monster.id
+                        }
+                        type="button"
+                        onClick={() =>
+                          setActiveMonsterIndex(
+                            index
+                          )
+                        }
+                        aria-label={`${index + 1}번째 몬스터`}
+                        className={`
+                          h-1.5
+                          rounded-full
+                          transition-all
+                          duration-300
+                          ${
+                            index ===
+                            activeMonsterIndex
+                              ? 'w-5 bg-white'
+                              : 'w-1.5 bg-white/45'
+                          }
+                        `}
+                      />
+                    )
                   )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* 보유 몬스터 없음 */
+            <button
+              type="button"
+              onClick={
+                handleTouchCenter
+              }
+              className="
+                mb-3
+                flex
+                flex-col
+                items-center
+                active:scale-[0.98]
+                transition-transform
+              "
+            >
+              <div
+                className="
+                  relative
+                  w-44
+                  h-44
+                  flex
+                  items-center
+                  justify-center
+                "
+              >
+                <div
+                  className="
+                    absolute
+                    inset-0
+                    rounded-full
+                    bg-white/30
+                    border
+                    border-white/50
+                  "
+                />
+
+                <div
+                  className="
+                    relative
+                    w-32
+                    h-32
+                    rounded-full
+                    bg-gradient-to-br
+                    from-[#327052]
+                    to-[#1F4B3C]
+                    flex
+                    flex-col
+                    items-center
+                    justify-center
+                    text-white
+                    shadow-[0_18px_35px_rgba(31,75,60,0.22)]
+                  "
+                >
+                  <Ghost
+                    size={50}
+                    strokeWidth={1.7}
+                    className="mb-1"
+                  />
+
+                  <span
+                    className="
+                      text-[9px]
+                      tracking-[0.18em]
+                      font-black
+                      opacity-90
+                    "
+                  >
+                    START
+                  </span>
                 </div>
               </div>
 
-              <div className="w-40 h-6 bg-[#1F4B3C]/10 rounded-full blur-md mt-3" />
-            </div>
+              <p
+                className="
+                  mt-5
+                  text-sm
+                  font-black
+                  text-[#284336]
+                "
+              >
+                아직 만난 몬스터가
+                없어요
+              </p>
 
-            <div className="mt-2 flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-white shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-[#3E7A5C] animate-pulse" />
-              <span className="text-xs font-black text-[#1B1B1B]">{partnerMonster.name}</span>
-            </div>
-          </div>
-        ) : (
-          /* [보유 몬스터 0마리일 때] */
-          <div
-            onClick={handleTouchCenter}
-            className="w-64 bg-white/80 backdrop-blur-md border border-white/90 rounded-3xl p-6 flex flex-col items-center text-center shadow-[0_8px_24px_rgba(0,0,0,0.04)] cursor-pointer active:scale-95 transition-all"
-          >
-            <div className="relative w-28 h-28 flex items-center justify-center mb-4">
-              <div className="absolute inset-0 bg-[#3E7A5C]/10 rounded-full animate-ping opacity-25" />
-              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-[#1F4B3C] to-[#3E7A5C] flex flex-col items-center justify-center text-white shadow-md">
-                <Ghost size={38} strokeWidth={1.8} className="animate-bounce" />
-                <span className="text-[9px] font-black tracking-widest mt-1 opacity-90">START</span>
-              </div>
-            </div>
+              <p
+                className="
+                  mt-2
+                  text-xs
+                  text-[#718278]
+                  leading-relaxed
+                  text-center
+                  break-keep
+                "
+              >
+                주변 사물을 촬영하고
+                걸어서
+                <br />
+                첫 몬스터를
+                만나보세요!
+              </p>
+            </button>
+          )}
+        </main>
 
-            <p className="text-xs font-bold text-[#4D6353] leading-relaxed">
-              주변 사물을 카메라로 비추면<br />
-              <span className="text-[#1F4B3C] font-black">나만의 첫 몬스터</span>가 탄생해요!
-            </p>
-          </div>
-        )}
-      </main>
-
-      {/* ───────── 3. 하단 퀵 액션 버튼 ───────── */}
-      <footer className="z-10 shrink-0 px-2">
-        <Link
-          href="/scans"
-          className="w-full py-3.5 rounded-xl bg-[#1F4B3C] text-white font-bold text-xs sm:text-sm shadow-[0_4px_14px_rgba(31,75,60,0.2)] flex items-center justify-center gap-2 active:scale-95 transition-all"
+        {/* 하단 CTA */}
+        <footer
+          className="
+            shrink-0
+            flex
+            justify-center
+            px-4
+            pb-6
+            pointer-events-auto
+          "
         >
-          <Camera size={16} />
-          <span>{partnerMonster ? '새로운 사물 촬영하기' : '첫 몬스터 찾으러 가기'}</span>
-          <ArrowRight size={14} />
-        </Link>
-      </footer>
-
-      {/* 플로팅 모션 */}
-      <style jsx>{`
-        @keyframes floating {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-6px); }
-        }
-        .animate-floating {
-          animation: floating 3.2s ease-in-out infinite;
-        }
-      `}</style>
-
+          <Link
+            href="/scans"
+            className="
+              min-w-[210px]
+              max-w-[250px]
+              px-6
+              py-3
+              rounded-full
+              bg-[#1F4B3C]
+              text-white
+              font-black
+              text-sm
+              shadow-[0_8px_20px_rgba(0,0,0,0.18)]
+              border
+              border-white/10
+              flex
+              items-center
+              justify-center
+              active:scale-[0.97]
+              transition-transform
+              animate-[pulse_3s_ease-in-out_infinite]
+            "
+          >
+            몬스터 찾으러 가기
+          </Link>
+        </footer>
+      </div>
     </div>
   );
 }
-
