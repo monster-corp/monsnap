@@ -18,6 +18,7 @@ export async function GET() {
                 currentSteps: egg.currentSteps,
                 requiredSteps: egg.requiredSteps,
                 activeWalkSessionId: egg.eggWalkSessions[0]?.id.toString() ?? null,
+                activeWalkSessionSteps: egg.eggWalkSessions[0]?.stepsCaptured ?? null,
                 cutoutImageUrl: egg.monster.cutoutImageUrl,
             })),
         });

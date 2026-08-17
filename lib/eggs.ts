@@ -164,7 +164,7 @@ export function getUserEggs(userId: bigint) {
                     status: WalkSessionStatus.ACTIVE,
                     lastActiveAt: {gte: new Date(Date.now() - WALK_SESSION_TIMEOUT_MS)},
                 },
-                select: {id: true},
+                select: {id: true, stepsCaptured: true},
             },
         },
         orderBy: {createdAt: "asc"},
