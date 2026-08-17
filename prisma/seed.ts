@@ -156,6 +156,7 @@ async function main() {
       name: '파리지옥',
       imageUrl: `${STORAGE_BASE_URL}/파리지옥.png`,
       cutoutImageUrl: `${STORAGE_BASE_URL}/파리지옥(누끼).png`,
+      bgImageUrl: `${STORAGE_BASE_URL}/배경(파리지옥).png`,
       hp: 2000,
       weakAttribute: 'FIRE',
       strongAttribute: 'WATER',

@@ -157,6 +157,7 @@ model Boss {
   name            String   @db.VarChar(100)
   imageUrl        String   @map("image_url")
   cutoutImageUrl  String?   @map("cutout_image_url")
+  bgImageUrl  String?   @map("bg_image_url")
   hp              Int
   weakAttribute   String?  @map("weak_attribute") @db.VarChar(20)
   strongAttribute String?  @map("strong_attribute") @db.VarChar(20)
