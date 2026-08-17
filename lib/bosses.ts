@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { calculateFinalStats } from "@/lib/stats";
 import { ApiError } from "@/lib/api/response";
+import { BossNotFoundError, BattleParamRequiredError } from "@/lib/errors/bosses";
+
+// 매직 넘버 상수화
+const DEFAULT_TIME_LIMIT_MS = 30000;
+const TIME_LIMIT_BUFFER_MS = 500;
 
 const MULTIPLIERS = {
   WEAK: 1.5,
@@ -9,7 +14,7 @@ const MULTIPLIERS = {
 };
 
 export interface ProcessBattleInput {
-  userId: bigint | string;
+  userId: bigint;
   bossId: bigint;
   userMonsterId: bigint;
   touchCount: number;
@@ -24,14 +29,14 @@ export async function getActiveBossById(bossId: bigint) {
   });
 
   if (!boss) {
-    throw new ApiError("BOSS_NOT_FOUND");
+    throw new BossNotFoundError();
   }
 
   return {
     id: boss.id.toString(),
     name: boss.name,
     hp: boss.hp,
-    timeLimitMs: boss.timeLimitMs ?? 30000,
+    timeLimitMs: boss.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS,
     weakAttribute: boss.weakAttribute,
     strongAttribute: boss.strongAttribute,
     cutoutImageUrl: boss.cutoutImageUrl ?? null,
@@ -48,29 +53,29 @@ export async function processBossBattle(input: ProcessBattleInput) {
       where: { id: bossId, isActive: true },
     }),
     prisma.userMonster.findFirst({
-      where: { id: userMonsterId, userId: BigInt(userId) },
+      where: { id: userMonsterId, userId },
       include: { monster: true },
     }),
   ]);
 
   if (!boss) {
-    throw new ApiError("BOSS_NOT_FOUND");
+    throw new BossNotFoundError();
   }
   if (!userMonster) {
     throw new ApiError("USER_MONSTER_NOT_FOUND");
   }
 
   // 어뷰징 검증
-  const TIME_LIMIT_MS = boss.timeLimitMs ?? 30000;
+  const TIME_LIMIT_MS = boss.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS;
 
   // 크리티컬 횟수 초과 검증
   if (criticalCount > touchCount) {
-    throw new ApiError("INVALID_REQUEST");
+    throw new BattleParamRequiredError();
   }
 
   // 제한시간 초과 검증
-  if (elapsedMs > TIME_LIMIT_MS + 500) {
-    throw new ApiError("INVALID_REQUEST");
+  if (elapsedMs > TIME_LIMIT_MS + TIME_LIMIT_BUFFER_MS) {
+    throw new BattleParamRequiredError();
   }
 
   // 경과 시간(elapsedMs) 기준 동적 터치 상한 계산
@@ -78,7 +83,7 @@ export async function processBossBattle(input: ProcessBattleInput) {
   const maxAllowedTouches = Math.ceil((effectiveElapsedMs / 1000) * 15) + 3;
 
   if (touchCount > maxAllowedTouches) {
-    throw new ApiError("INVALID_REQUEST");
+    throw new BattleParamRequiredError();
   }
 
   // 스탯 및 속성 상성 데미지 계산
@@ -119,7 +124,7 @@ export async function processBossBattle(input: ProcessBattleInput) {
   // 전투 기록 저장
   const battleLog = await prisma.battleLog.create({
     data: {
-      userId: BigInt(userId),
+      userId,
       bossId: boss.id,
       userMonsterId: userMonster.id,
       battleType: "BOSS_TIMED",

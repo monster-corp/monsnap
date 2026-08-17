@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     return respondWithStatus("OK", bossData);
   } catch (err) {
     if (err instanceof ApiError) {
-      return respondWithStatus(err.key);
+      return respondWithStatus(err.key, null, err.message);
     }
     console.error("[/api/bosses/[bossId] GET] unexpected error:", err);
     return respondWithStatus("INTERNAL_ERROR");
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return respondWithStatus("OK", result);
   } catch (err) {
     if (err instanceof ApiError) {
-      return respondWithStatus(err.key);
+      return respondWithStatus(err.key, null, err.message);
     }
     console.error("[/api/bosses/[bossId] POST] unexpected error:", err);
     return respondWithStatus("INTERNAL_ERROR");
