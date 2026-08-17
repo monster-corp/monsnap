@@ -1,93 +1,97 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { Lock, Camera, Footprints } from 'lucide-react'
-import { Noto_Sans_KR } from 'next/font/google'
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Lock, Camera, Footprints } from 'lucide-react';
+import { Noto_Sans_KR } from 'next/font/google';
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '700', '900'],
   display: 'swap',
   preload: false,
-})
+});
 
-type Tab = 'capture' | 'developing'
-type CaptureStep = 'idle' | 'scanning'
+type Tab = 'capture' | 'developing';
+type CaptureStep = 'idle' | 'scanning';
 
+// iOS의 비표준 센서 권한 API를 타입에 추가한다
 type DeviceMotionEventWithPermission = typeof DeviceMotionEvent & {
-  requestPermission?: () => Promise<'granted' | 'denied'>
-}
+  requestPermission?: () => Promise<'granted' | 'denied'>;
+};
 
-const MIN_DEVELOP_MS = 2600
-const CODE_OK = 20000
-const CODE_EGG_SLOT_FULL = 40900
-const REQUEST_TIMEOUT_MS = 20000
-const MAX_IMAGE_EDGE = 1280
-const JPEG_QUALITY = 0.85
-const MAX_EGG_SLOTS = 3
-const MANUAL_STEP_SMALL = 5
-const MANUAL_STEP_LARGE = 20
-const SYNC_INTERVAL_MS = 5000
-const STEPS_STORAGE_PREFIX = 'monsnap:walk:'
-const REVEAL_ANIMATION_MS = 2400
+// 서버 응답이 빨라도 최소 인화 연출 시간은 보장한다
+const MIN_DEVELOP_MS = 2600;
 
-// 가속도계 기반 걸음 감지를 위한 MVP 임계값 및 중복 감지 방지 시간
-const STEP_THRESHOLD = 11.5
-const STEP_COOLDOWN_MS = 300
+// 일부 차단 응답도 HTTP 200이므로 API code로 성공 여부를 판단한다
+const CODE_OK = 20000;
+const CODE_EGG_SLOT_FULL = 40900;
+
+const CODE_WALK_SESSION_NOT_FOUND = 40401;
+const CODE_SESSION_NOT_ACTIVE = 40902;
+
+const REQUEST_TIMEOUT_MS = 20000;
+
+const MAX_IMAGE_EDGE = 1280;
+const JPEG_QUALITY = 0.85;
+
+const MAX_EGG_SLOTS = 3;
+
+// TODO: 실기기 센서 검증 후 수동 걸음 버튼 유지 여부 결정
+const MANUAL_STEP_SMALL = 5;
+const MANUAL_STEP_LARGE = 20;
+
+const SYNC_INTERVAL_MS = 5000;
+const STEPS_STORAGE_PREFIX = 'monsnap:walk:';
+const REVEAL_ANIMATION_MS = 2400;
+
+// MVP용 가속도 임계값 기반 걸음 감지.
+// 실기기 테스트 기준 일반 보행은 정상 감지되며,
+// 작은 보폭 및 의도적인 흔들림에서는 오차가 발생할 수 있다.
+const STEP_THRESHOLD = 13.5;
+const STEP_COOLDOWN_MS = 450;
 
 type Egg = {
-  eggId: string
-  status: string
-  currentSteps: number
-  requiredSteps: number
-  activeWalkSessionId: string | null
-  cutoutImageUrl?: string | null
-}
+  eggId: string;
+  status: string;
+  currentSteps: number;
+  requiredSteps: number;
+  activeWalkSessionId: string | null;
+  cutoutImageUrl?: string | null;
+};
 
 type RevealedMonster = {
-  id: string
-  name: string
-  rarity: string
-  material: string
-  shape: string
-  imageUrl: string
-}
+  id: string;
+  name: string;
+  rarity: string;
+  material: string;
+  shape: string;
+  imageUrl: string;
+};
 
 const MATERIAL_LABEL: Record<string, string> = {
-  NORMAL: '일반',
-  FIRE: '불',
-  WATER: '물',
-  GRASS: '식물',
-  METAL: '금속',
-  CERAMIC: '도자기',
-  GLASS: '유리',
-  PLASTIC: '플라스틱',
-  ELECTRIC: '전기',
-}
+  NORMAL: '일반', FIRE: '불', WATER: '물', GRASS: '식물', METAL: '금속',
+  CERAMIC: '도자기', GLASS: '유리', PLASTIC: '플라스틱', ELECTRIC: '전기',
+};
 
 const SHAPE_LABEL: Record<string, string> = {
-  FREEFORM: '자유형',
-  ROUND: '둥글',
-  TRIANGLE: '세모',
-  SQUARE: '네모',
-  LONG: '길쭉',
-}
+  FREEFORM: '자유형', ROUND: '둥글', TRIANGLE: '세모', SQUARE: '네모', LONG: '길쭉',
+};
 
 const RARITY_STYLE: Record<string, string> = {
   COMMON: 'bg-[#8F9A92]',
   RARE: 'bg-[#5B7B9C]',
   EPIC: 'bg-[#A778C2]',
-}
+};
 
-/** 모바일 환경 햅틱 진동 피드백 유틸 */
 const triggerHaptic = (type: 'snap' | 'step' | 'success' | 'rare' | 'epic') => {
-  if (typeof window === 'undefined' || !('vibrate' in navigator)) return
-  if (type === 'snap') navigator.vibrate(50)
-  if (type === 'step') navigator.vibrate(20)
-  if (type === 'success') navigator.vibrate([40, 60, 80, 60, 200])
-  if (type === 'rare') navigator.vibrate(70)
-  if (type === 'epic') navigator.vibrate([60, 100, 60, 100, 250])
-}
+  if (typeof window === 'undefined' || !('vibrate' in navigator)) return;
+
+  if (type === 'snap') navigator.vibrate(50);
+  if (type === 'step') navigator.vibrate(20);
+  if (type === 'success') navigator.vibrate([40, 60, 80, 60, 200]);
+  if (type === 'rare') navigator.vibrate(70);
+  if (type === 'epic') navigator.vibrate([60, 100, 60, 100, 250]);
+};
 
 function MonsterSilhouette({ className = '' }: { className?: string }) {
   return (
@@ -99,105 +103,107 @@ function MonsterSilhouette({ className = '' }: { className?: string }) {
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }
 
-/** 사물 인식(VLM) 및 업로드 페이로드 최적화를 위한 이미지 리사이징 & 압축 처리 */
+// VLM 전송 부담을 줄이기 위해 이미지를 축소하며, 실패 시 원본을 사용한다
+// 일부 모바일에서 파일 타입이 비어 오므로 축소 여부와 관계없이 MIME 타입을 보정한다.
 async function resizeImage(file: File): Promise<File> {
   try {
-    const bitmap = await createImageBitmap(file)
-    const { width, height } = bitmap
-    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(width, height))
+    const bitmap = await createImageBitmap(file);
+    const { width, height } = bitmap;
+    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(width, height));
 
     if (scale >= 1) {
-      bitmap.close()
+      bitmap.close();
       const hasValidType =
         file.type === 'image/jpeg' ||
         file.type === 'image/png' ||
-        file.type === 'image/webp'
-      if (hasValidType) return file
-      return new File([file], file.name, { type: 'image/jpeg' })
+        file.type === 'image/webp';
+      if (hasValidType) return file;
+      return new File([file], file.name, { type: 'image/jpeg' });
     }
 
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(width * scale)
-    canvas.height = Math.round(height * scale)
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
 
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d');
     if (!ctx) {
-      bitmap.close()
-      return file
+      bitmap.close();
+      return file;
     }
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    bitmap.close()
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY),
-    )
-    if (!blob) return file
+      canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY)
+    );
+    if (!blob) return file;
 
-    return new File([blob], 'scan.jpg', { type: 'image/jpeg' })
+    return new File([blob], 'scan.jpg', { type: 'image/jpeg' });
   } catch {
-    return file
+    return file;
   }
 }
 
 export default function ScansPage() {
-  const router = useRouter()
-  const [tab, setTab] = useState<Tab>('capture')
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>('capture');
 
-  const [captureStep, setCaptureStep] = useState<CaptureStep>('idle')
-  const [isScanDone, setIsScanDone] = useState(false)
-  const [scanError, setScanError] = useState<string | null>(null)
-  const [isSlotFull, setIsSlotFull] = useState(false)
-  const [newEggSteps, setNewEggSteps] = useState<number | null>(null)
-  const [isFlashing, setIsFlashing] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [captureStep, setCaptureStep] = useState<CaptureStep>('idle');
+  const [isScanDone, setIsScanDone] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [isSlotFull, setIsSlotFull] = useState(false);
+  const [newEggSteps, setNewEggSteps] = useState<number | null>(null);
+  const [isFlashing, setIsFlashing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const [eggs, setEggs] = useState<Egg[]>([])
-  const [selectedEggId, setSelectedEggId] = useState<string | null>(null)
-  const [eggsLoading, setEggsLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [eggError, setEggError] = useState<string | null>(null)
-  const [isRevealing, setIsRevealing] = useState(false)
-  const [revealedMonster, setRevealedMonster] =
-    useState<RevealedMonster | null>(null)
-  const [isNewMonster, setIsNewMonster] = useState(false)
+  const [eggs, setEggs] = useState<Egg[]>([]);
+  const [selectedEggId, setSelectedEggId] = useState<string | null>(null);
+  const [eggsLoading, setEggsLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [eggError, setEggError] = useState<string | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [revealedMonster, setRevealedMonster] = useState<RevealedMonster | null>(null);
+  const [isNewMonster, setIsNewMonster] = useState(false);
 
-  const localStepsRef = useRef(0)
-  const lastSentRef = useRef(0)
-  const currentStepsRef = useRef(0)
-  const [sessionSteps, setSessionSteps] = useState(0)
-  const lastStepTimeRef = useRef(0)
+  const localStepsRef = useRef(0);
+  const lastSentRef = useRef(0);
+  const currentStepsRef = useRef(0);
+  const lastStepTimeRef = useRef(0);
+  const [sessionSteps, setSessionSteps] = useState(0);
 
-  const currentEgg = eggs.find((e) => e.eggId === selectedEggId) ?? null
-  const isWalking = currentEgg?.activeWalkSessionId != null
-  const isReadyToReveal = currentEgg?.status === 'READY'
-  const activeSessionId = currentEgg?.activeWalkSessionId ?? null
+  const currentEgg = eggs.find((egg) => egg.eggId === selectedEggId) ?? null;
+
+  // 선택한 알이 바뀌어도 활성 걷기 세션 기준으로 동기화를 유지한다
+  const walkingEgg = eggs.find((egg) => egg.activeWalkSessionId != null) ?? null;
+  const isWalking = walkingEgg !== null;
+  const activeSessionId = walkingEgg?.activeWalkSessionId ?? null;
+  const isReadyToReveal = currentEgg?.status === 'READY';
 
   useEffect(() => {
-    currentStepsRef.current = currentEgg?.currentSteps ?? 0
-  }, [currentEgg?.eggId, currentEgg?.currentSteps])
+    currentStepsRef.current = walkingEgg?.currentSteps ?? 0;
+  }, [walkingEgg?.eggId, walkingEgg?.currentSteps]);
 
-  /** [GET /api/eggs] 미부화 알 목록 조회 및 슬롯 상태 동기화 */
   const loadEggs = useCallback(async () => {
     try {
-      const res = await fetch('/api/eggs')
-      const body = await res.json().catch(() => null)
+      const res = await fetch('/api/eggs');
+      const body = await res.json().catch(() => null);
 
       if (!res.ok || body?.code !== CODE_OK) {
-        setEggError(body?.message ?? '인화 대기 목록을 불러오지 못했어요.')
-        return
+        setEggError(body?.message ?? '인화 대기 목록을 불러오지 못했어요.');
+        return;
       }
 
-      const list = body.data?.eggs
+      const list = body.data?.eggs;
 
       if (!Array.isArray(list)) {
-        console.error('[촬영] 예상하지 못한 알 목록 응답 구조:', body)
-
-        setEggError('인화 대기 목록을 불러오지 못했어요.')
-        setEggs([])
-        return
+        console.error('[촬영] 예상하지 못한 알 목록 응답 구조:', body);
+        setEggError('인화 대기 목록을 불러오지 못했어요.');
+        setEggs([]);
+        setSelectedEggId(null);
+        return;
       }
 
       const parsedEggs: Egg[] = list.map((item) => ({
@@ -207,464 +213,449 @@ export default function ScansPage() {
         requiredSteps: item.requiredSteps,
         activeWalkSessionId: item.activeWalkSessionId,
         cutoutImageUrl: item.cutoutImageUrl,
-      }))
+      }));
 
-      setEggs(parsedEggs)
-      setEggError(null)
+      // 서버에 없는 만료 세션의 로컬 키를 정리한다
+      const activeSessionIds = new Set(
+        parsedEggs
+          .map((egg) => egg.activeWalkSessionId)
+          .filter((id): id is string => id !== null)
+      );
+
+      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+        const key = localStorage.key(i);
+        if (!key?.startsWith(STEPS_STORAGE_PREFIX)) continue;
+
+        const sessionId = key.slice(STEPS_STORAGE_PREFIX.length);
+        if (!activeSessionIds.has(sessionId)) {
+          localStorage.removeItem(key);
+        }
+      }
+
+      setEggs(parsedEggs);
+      setEggError(null);
 
       setSelectedEggId((prev) =>
         prev && parsedEggs.some((egg) => egg.eggId === prev)
           ? prev
-          : (parsedEggs[0]?.eggId ?? null),
-      )
+          : (parsedEggs[0]?.eggId ?? null)
+      );
     } catch {
-      setEggError('네트워크 오류가 발생했어요.')
+      setEggError('네트워크 오류가 발생했어요.');
     } finally {
-      setEggsLoading(false)
+      setEggsLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    loadEggs()
-  }, [loadEggs])
+    void loadEggs();
+  }, [loadEggs]);
 
+  // 활성 세션의 미전송 걸음 수를 복원한다
   useEffect(() => {
     if (!activeSessionId) {
-      localStepsRef.current = 0
-      lastSentRef.current = 0
-      setSessionSteps(0)
-      return
+      localStepsRef.current = 0;
+      lastSentRef.current = 0;
+      setSessionSteps(0);
+      return;
     }
 
     const saved = Number(
-      localStorage.getItem(STEPS_STORAGE_PREFIX + activeSessionId) ?? 0,
-    )
-    localStepsRef.current = Number.isFinite(saved) ? saved : 0
-    lastSentRef.current = 0
-    setSessionSteps(localStepsRef.current)
-  }, [activeSessionId])
+      localStorage.getItem(STEPS_STORAGE_PREFIX + activeSessionId) ?? 0
+    );
+    localStepsRef.current = Number.isFinite(saved) ? saved : 0;
+    lastSentRef.current = 0;
+    setSessionSteps(localStepsRef.current);
+  }, [activeSessionId]);
 
-  /** [PATCH /api/eggs/:id/walk-sessions/:sessionId] 누적 걸음 수를 서버에 전송하고 목표 달성 상태 갱신 (성공 여부 반환) */
+  // 누적값 동기화라 일시 실패 후 다음 주기에 재전송할 수 있다
   const syncSteps = useCallback(async (): Promise<boolean> => {
-    if (!currentEgg?.activeWalkSessionId) return true
+    if (!walkingEgg?.activeWalkSessionId) return true;
 
-    const steps = localStepsRef.current
-    if (steps <= lastSentRef.current) return true
+    const sessionId = walkingEgg.activeWalkSessionId;
+    const steps = localStepsRef.current;
+
+    // 서버는 감소한 누적값을 거부하므로 증가했을 때만 전송한다
+    if (steps <= lastSentRef.current) return true;
 
     try {
       const res = await fetch(
-        `/api/eggs/${currentEgg.eggId}/walk-sessions/${currentEgg.activeWalkSessionId}`,
+        `/api/eggs/${walkingEgg.eggId}/walk-sessions/${sessionId}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ stepsCaptured: steps }),
-        },
-      )
-      const body = await res.json().catch(() => null)
-
-      if (res.status === 404 || body?.code === 40401) {
-        if (currentEgg.activeWalkSessionId) {
-          localStorage.removeItem(
-            STEPS_STORAGE_PREFIX + currentEgg.activeWalkSessionId,
-          )
         }
-        await loadEggs()
-        return false
+      );
+      const body = await res.json().catch(() => null);
+
+      // 만료/종료된 세션이면 로컬 키를 지우고 서버 상태로 재동기화한다
+      if (
+        body?.code === CODE_WALK_SESSION_NOT_FOUND ||
+        body?.code === CODE_SESSION_NOT_ACTIVE
+      ) {
+        localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
+        await loadEggs();
+        setEggError('걷기 세션이 종료되었어요. 다시 시작해주세요.');
+        return false;
       }
 
-      if (!res.ok || body?.code !== CODE_OK) return false
+      if (!res.ok || body?.code !== CODE_OK) {
+        setEggError(body?.message ?? '걸음 수를 서버에 저장하지 못했어요.');
+        return false;
+      }
 
-      const egg = body.data?.egg
+      const egg = body.data?.egg;
 
       if (!egg) {
-        console.error('[촬영] 예상하지 못한 걸음 동기화 응답 구조:', body)
-        return false
+        console.error('[촬영] 예상하지 못한 걸음 동기화 응답 구조:', body);
+        setEggError('걸음 수 저장 결과를 확인하지 못했어요.');
+        return false;
       }
 
-      lastSentRef.current = steps
+      lastSentRef.current = steps;
 
       setEggs((prev) =>
-        prev.map((e) =>
-          e.eggId === egg.id
-            ? {
-                ...e,
-                currentSteps: egg.currentSteps,
-                status: egg.status,
-              }
-            : e,
-        ),
-      )
+        prev.map((item) =>
+          item.eggId === egg.id
+            ? { ...item, currentSteps: egg.currentSteps, status: egg.status }
+            : item
+        )
+      );
 
-      return true
+      setEggError(null);
+      return true;
     } catch {
-      return false
+      setEggError('걸음 수를 저장하지 못했어요. 네트워크 상태를 확인해주세요.');
+      return false;
     }
-  }, [currentEgg, loadEggs])
+  }, [walkingEgg, loadEggs]);
 
-  /**
-   * 걸음 수 증가
-   * - 센서 측정: amount = 1, haptic = false
-   * - 시연 버튼: amount = 5/20, haptic = true
-   */
+  // 목표 걸음 수에 도달하면 즉시 서버에 동기화한다
   const addSteps = useCallback(
     (amount: number, haptic = false) => {
-      if (amount <= 0 || !currentEgg?.activeWalkSessionId) return
+      if (amount <= 0 || !walkingEgg?.activeWalkSessionId) return;
 
-      if (haptic) {
-        triggerHaptic('step')
-      }
+      if (haptic) triggerHaptic('step');
 
-      localStepsRef.current += amount
-      setSessionSteps(localStepsRef.current)
+      localStepsRef.current += amount;
+      setSessionSteps(localStepsRef.current);
 
       localStorage.setItem(
-        STEPS_STORAGE_PREFIX + currentEgg.activeWalkSessionId,
-        String(localStepsRef.current),
-      )
+        STEPS_STORAGE_PREFIX + walkingEgg.activeWalkSessionId,
+        String(localStepsRef.current)
+      );
 
       const nextSteps = Math.min(
-        currentEgg.requiredSteps,
-        currentStepsRef.current + amount,
-      )
-
-      currentStepsRef.current = nextSteps
+        walkingEgg.requiredSteps,
+        currentStepsRef.current + amount
+      );
+      currentStepsRef.current = nextSteps;
 
       setEggs((prev) =>
-        prev.map((e) =>
-          e.eggId === currentEgg.eggId
-            ? {
-                ...e,
-                currentSteps: nextSteps,
-              }
-            : e,
-        ),
-      )
+        prev.map((egg) =>
+          egg.eggId === walkingEgg.eggId ? { ...egg, currentSteps: nextSteps } : egg
+        )
+      );
 
-      if (nextSteps >= currentEgg.requiredSteps) {
-        void syncSteps()
+      if (nextSteps >= walkingEgg.requiredSteps) {
+        void syncSteps();
       }
     },
-    [currentEgg, syncSteps],
-  )
+    [walkingEgg, syncSteps]
+  );
 
-  /**
-   * 1. 가속도계(DeviceMotion) 이벤트를 이용한 실제 걸음 자동 감지
-   */
   useEffect(() => {
-    if (!isWalking) return
+    if (!isWalking) return;
 
     const handleDeviceMotion = (event: DeviceMotionEvent) => {
-      const acc = event.accelerationIncludingGravity
+      const acc = event.accelerationIncludingGravity;
+      if (!acc || acc.x === null || acc.y === null || acc.z === null) return;
 
-      if (!acc || acc.x === null || acc.y === null || acc.z === null) {
-        return
-      }
+      const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const now = Date.now();
 
-      const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z)
-
-      const now = Date.now()
-
+      // 한 동작의 중복 감지를 막는다
       if (
         magnitude > STEP_THRESHOLD &&
         now - lastStepTimeRef.current > STEP_COOLDOWN_MS
       ) {
-        lastStepTimeRef.current = now
-        addSteps(1, false)
+        lastStepTimeRef.current = now;
+        addSteps(1, false);
       }
-    }
+    };
 
-    window.addEventListener('devicemotion', handleDeviceMotion)
+    window.addEventListener('devicemotion', handleDeviceMotion);
+    return () => window.removeEventListener('devicemotion', handleDeviceMotion);
+  }, [isWalking, addSteps]);
 
-    return () => {
-      window.removeEventListener('devicemotion', handleDeviceMotion)
-    }
-  }, [isWalking, addSteps])
-
-  /**
-   * 2. 5초마다 주기적으로 서버와 걸음 수 동기화
-   */
   useEffect(() => {
-    if (!isWalking) return
+    if (!isWalking) return;
 
     const timer = setInterval(() => {
-      void syncSteps()
-    }, SYNC_INTERVAL_MS)
+      void syncSteps();
+    }, SYNC_INTERVAL_MS);
 
-    return () => clearInterval(timer)
-  }, [isWalking, syncSteps])
+    return () => clearInterval(timer);
+  }, [isWalking, syncSteps]);
 
-  /**
-   * 3. 화면을 나갈 때(백그라운드 전환 등) 마지막 동기화
-   */
+  // 백그라운드 전환 전에 미전송 걸음을 한 번 더 동기화한다
   useEffect(() => {
-    if (!isWalking) return
+    if (!isWalking) return;
 
     const handleVisibilityChange = () => {
-      if (document.hidden) void syncSteps()
-    }
+      if (document.hidden) void syncSteps();
+    };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () =>
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [isWalking, syncSteps])
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isWalking, syncSteps]);
 
-  /** [POST /api/scans] 촬영 이미지 전송 -> AI 분석 및 새 알(Egg) 생성 */
   const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setIsFlashing(true)
-    setTimeout(() => setIsFlashing(false), 250)
-    triggerHaptic('snap')
+    setIsFlashing(true);
+    setTimeout(() => setIsFlashing(false), 250);
+    triggerHaptic('snap');
 
-    e.target.value = ''
+    e.target.value = '';
 
-    setScanError(null)
-    setIsSlotFull(false)
-    setIsScanDone(false)
-    setNewEggSteps(null)
-    setCaptureStep('scanning')
+    setScanError(null);
+    setIsSlotFull(false);
+    setIsScanDone(false);
+    setNewEggSteps(null);
+    setCaptureStep('scanning');
 
-    const startedAt = Date.now()
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const startedAt = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const uploadFile = await resizeImage(file)
-      const formData = new FormData()
-      formData.append('image', uploadFile)
+      const uploadFile = await resizeImage(file);
+      const formData = new FormData();
+      formData.append('image', uploadFile);
 
       const res = await fetch('/api/scans', {
         method: 'POST',
         body: formData,
         signal: controller.signal,
-      })
+      });
 
-      const body = await res.json().catch(() => null)
+      const body = await res.json().catch(() => null);
 
-      const elapsed = Date.now() - startedAt
+      const elapsed = Date.now() - startedAt;
       if (elapsed < MIN_DEVELOP_MS) {
         await new Promise((resolve) =>
-          setTimeout(resolve, MIN_DEVELOP_MS - elapsed),
-        )
+          setTimeout(resolve, MIN_DEVELOP_MS - elapsed)
+        );
       }
 
       if (!res.ok || body?.code !== CODE_OK) {
-        setIsSlotFull(body?.code === CODE_EGG_SLOT_FULL)
-        setScanError(body?.message ?? '스캔에 실패했어요. 다시 시도해주세요.')
-        setCaptureStep('idle')
-        return
+        setIsSlotFull(body?.code === CODE_EGG_SLOT_FULL);
+        setScanError(body?.message ?? '스캔에 실패했어요. 다시 시도해주세요.');
+        setCaptureStep('idle');
+        return;
       }
 
-      const requiredSteps = body.data?.requiredSteps
+      const requiredSteps = body.data?.requiredSteps;
 
       if (typeof requiredSteps !== 'number') {
-        console.error('[촬영] 예상하지 못한 스캔 응답 구조:', body)
-
-        setScanError('스캔 결과를 확인하지 못했어요. 다시 시도해주세요.')
-        setCaptureStep('idle')
-        return
+        console.error('[촬영] 예상하지 못한 스캔 응답 구조:', body);
+        setScanError('스캔 결과를 확인하지 못했어요. 다시 시도해주세요.');
+        setCaptureStep('idle');
+        return;
       }
 
-      setNewEggSteps(requiredSteps)
-      setIsScanDone(true)
-      await loadEggs()
+      setNewEggSteps(requiredSteps);
+      setIsScanDone(true);
+      await loadEggs();
     } catch (err) {
-      const aborted = err instanceof DOMException && err.name === 'AbortError'
+      const aborted = err instanceof DOMException && err.name === 'AbortError';
       setScanError(
         aborted
           ? '분석이 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.'
-          : '네트워크 오류가 발생했어요. 다시 시도해주세요.',
-      )
-      setCaptureStep('idle')
+          : '네트워크 오류가 발생했어요. 다시 시도해주세요.'
+      );
+      setCaptureStep('idle');
     } finally {
-      clearTimeout(timeoutId)
+      clearTimeout(timeoutId);
     }
-  }
+  };
 
-  /** [POST /api/eggs/:id/walk-sessions] 선택한 알의 걷기 세션 시작 및 센서 권한 요청 */
   const handleStart = async () => {
-    if (!currentEgg || busy) return
+    if (!currentEgg || busy) return;
 
-    setBusy(true)
-    setEggError(null)
+    setBusy(true);
+    setEggError(null);
 
-    let sensorUnavailable = false
+    let sensorUnavailable = false;
 
-    // 센서 권한 확인 실패와 걷기 세션 생성 실패를 분리한다.
     try {
       if (typeof DeviceMotionEvent !== 'undefined') {
-        const deviceMotionEvent =
-          DeviceMotionEvent as DeviceMotionEventWithPermission
+        const deviceMotionEvent = DeviceMotionEvent as DeviceMotionEventWithPermission;
 
         if (typeof deviceMotionEvent.requestPermission === 'function') {
-          const permission = await deviceMotionEvent.requestPermission()
-
-          if (permission !== 'granted') {
-            sensorUnavailable = true
-          }
+          const permission = await deviceMotionEvent.requestPermission();
+          if (permission !== 'granted') sensorUnavailable = true;
         }
       }
     } catch {
-      sensorUnavailable = true
+      sensorUnavailable = true;
     }
 
     try {
       const res = await fetch(`/api/eggs/${currentEgg.eggId}/walk-sessions`, {
         method: 'POST',
-      })
-
-      const body = await res.json().catch(() => null)
+      });
+      const body = await res.json().catch(() => null);
 
       if (!res.ok || body?.code !== CODE_OK) {
-        setEggError(body?.message ?? '걷기를 시작하지 못했어요.')
-        return
+        setEggError(body?.message ?? '걷기를 시작하지 못했어요.');
+        return;
       }
 
-      localStepsRef.current = 0
-      lastSentRef.current = 0
-      lastStepTimeRef.current = 0
-      setSessionSteps(0)
+      localStepsRef.current = 0;
+      lastSentRef.current = 0;
+      lastStepTimeRef.current = 0;
+      setSessionSteps(0);
 
-      await loadEggs()
+      await loadEggs();
 
       if (sensorUnavailable) {
-        setEggError(
-          '센서를 사용할 수 없어 수동 걸음 버튼으로 진행할 수 있어요.',
-        )
+        setEggError('센서를 사용할 수 없어 수동 걸음 버튼으로 진행할 수 있어요.');
       }
     } catch {
-      setEggError('네트워크 오류가 발생했어요.')
+      setEggError('네트워크 오류가 발생했어요.');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
-  /** [POST /api/eggs/:id/walk-sessions/:sessionId/end] 걷기 세션 수동 종료 및 sync 보장 */
   const handleEnd = async () => {
-    if (!currentEgg?.activeWalkSessionId || busy) return
-    setBusy(true)
-    setEggError(null)
+    if (!walkingEgg?.activeWalkSessionId || busy) return;
 
-    const sessionId = currentEgg.activeWalkSessionId
-    const synced = await syncSteps()
+    setBusy(true);
+    setEggError(null);
+
+    const sessionId = walkingEgg.activeWalkSessionId;
+
+    const synced = await syncSteps();
 
     if (!synced) {
-      setEggError(
-        '마지막 걸음 수를 저장하지 못했어요. 잠시 후 다시 시도해주세요.',
-      )
-      setBusy(false)
-      return
+      setBusy(false);
+      return;
     }
 
     try {
       const res = await fetch(
-        `/api/eggs/${currentEgg.eggId}/walk-sessions/${sessionId}/end`,
-        {
-          method: 'POST',
-        },
-      )
-      const body = await res.json().catch(() => null)
+        `/api/eggs/${walkingEgg.eggId}/walk-sessions/${sessionId}/end`,
+        { method: 'POST' }
+      );
+      const body = await res.json().catch(() => null);
 
       if (!res.ok || body?.code !== CODE_OK) {
-        setEggError(body?.message ?? '걷기를 종료하지 못했어요.')
-        return
+        setEggError(body?.message ?? '걷기를 종료하지 못했어요.');
+        return;
       }
 
-      localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId)
-      await loadEggs()
+      localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
+      await loadEggs();
     } catch {
-      setEggError('네트워크 오류가 발생했어요.')
+      setEggError('네트워크 오류가 발생했어요.');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
-  /** [POST /api/eggs/:id/hatch] 100% 달성 알 부화 확정 */
   const handleReveal = async () => {
-    if (!currentEgg || busy || isRevealing) return
-    setIsRevealing(true)
-    setBusy(true)
-    setEggError(null)
+    if (!currentEgg || busy || isRevealing) return;
 
-    const sessionId = currentEgg.activeWalkSessionId
-    const startedAt = Date.now()
+    setIsRevealing(true);
+    setBusy(true);
+    setEggError(null);
+
+    const sessionId = currentEgg.activeWalkSessionId;
+    const startedAt = Date.now();
 
     try {
       const res = await fetch(`/api/eggs/${currentEgg.eggId}/hatch`, {
         method: 'POST',
-      })
-      const body = await res.json().catch(() => null)
+      });
+      const body = await res.json().catch(() => null);
 
-      const elapsed = Date.now() - startedAt
+      // 서버 응답이 빨라도 공개 연출 시간은 보장한다
+      const elapsed = Date.now() - startedAt;
       if (elapsed < REVEAL_ANIMATION_MS) {
-        await new Promise((r) => setTimeout(r, REVEAL_ANIMATION_MS - elapsed))
+        await new Promise((resolve) =>
+          setTimeout(resolve, REVEAL_ANIMATION_MS - elapsed)
+        );
       }
 
       if (!res.ok || body?.code !== CODE_OK) {
         if (res.status === 404) {
           if (sessionId) {
-            localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId)
+            localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
           }
-          await loadEggs()
+          await loadEggs();
         }
-        setEggError(body?.message ?? '인화에 실패했어요. 다시 시도해주세요.')
-        setIsRevealing(false)
-        return
+
+        setEggError(body?.message ?? '인화에 실패했어요. 다시 시도해주세요.');
+        setIsRevealing(false);
+        return;
       }
 
-      const monsterData = body.data?.monster
-
-      const newMonster = body.data?.isNewMonster
+      const monsterData = body.data?.monster;
+      const newMonster = body.data?.isNewMonster;
 
       if (!monsterData || typeof newMonster !== 'boolean') {
-        console.error('[촬영] 예상하지 못한 부화 응답 구조:', body)
-
-        setEggError('몬스터 정보를 확인하지 못했어요. 다시 시도해주세요.')
-        setIsRevealing(false)
-        return
+        console.error('[촬영] 예상하지 못한 부화 응답 구조:', body);
+        setEggError('몬스터 정보를 확인하지 못했어요. 다시 시도해주세요.');
+        setIsRevealing(false);
+        return;
       }
 
-      setRevealedMonster(monsterData)
-      setIsNewMonster(newMonster)
-      setIsRevealing(false)
+      setRevealedMonster(monsterData);
+      setIsNewMonster(newMonster);
+      setIsRevealing(false);
 
-      const rarity = monsterData?.rarity
-      if (rarity === 'EPIC') {
-        triggerHaptic('epic')
-      } else if (rarity === 'RARE') {
-        triggerHaptic('rare')
-      } else {
-        triggerHaptic('success')
-      }
+      const rarity = monsterData.rarity;
+      if (rarity === 'EPIC') triggerHaptic('epic');
+      else if (rarity === 'RARE') triggerHaptic('rare');
+      else triggerHaptic('success');
 
-      if (sessionId) localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId)
-      localStepsRef.current = 0
-      lastSentRef.current = 0
-      setSessionSteps(0)
+      if (sessionId) localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
+      localStepsRef.current = 0;
+      lastSentRef.current = 0;
+      setSessionSteps(0);
 
-      await loadEggs()
+      await loadEggs();
     } catch {
-      setEggError('네트워크 오류가 발생했어요.')
-      setIsRevealing(false)
+      setEggError('네트워크 오류가 발생했어요.');
+      setIsRevealing(false);
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   const progressPercent = currentEgg
     ? Math.min(
         100,
-        Math.round((currentEgg.currentSteps / currentEgg.requiredSteps) * 100),
+        Math.round((currentEgg.currentSteps / currentEgg.requiredSteps) * 100)
       )
-    : 0
+    : 0;
 
-  const blurPx = Math.max(3, 16 - (progressPercent / 100) * 13)
-  const grayscale = Math.max(15, 100 - progressPercent * 0.85)
-  const veilOpacity = Math.max(0.12, 0.5 - (progressPercent / 100) * 0.38)
+  // 확인 버튼을 누르기 전까지 몬스터가 완전히 드러나지 않도록 한다
+  const blurPx = Math.max(3, 16 - (progressPercent / 100) * 13);
+  const grayscale = Math.max(15, 100 - progressPercent * 0.85);
+  const veilOpacity = Math.max(0.12, 0.5 - (progressPercent / 100) * 0.38);
 
-  const displayDevelopingImage = currentEgg?.cutoutImageUrl ?? null
+  const displayDevelopingImage = currentEgg?.cutoutImageUrl ?? null;
+
+  // 선택한 알과 걷는 알이 다르면 조작을 막고 진행 중임을 안내한다
+  const isOtherEggWalking =
+    walkingEgg !== null && currentEgg?.eggId !== walkingEgg.eggId;
 
   return (
     <div
@@ -677,7 +668,6 @@ export default function ScansPage() {
       />
 
       <div className="w-full max-w-sm mx-auto flex flex-col h-full justify-between">
-        {/* ───────── 탭 (항상 유지) ───────── */}
         <div className="shrink-0 flex gap-1 mb-1.5">
           {(
             [
@@ -687,11 +677,10 @@ export default function ScansPage() {
           ).map(([key, label, Icon]) => (
             <button
               key={key}
+              type="button"
               onClick={() => setTab(key)}
               className={`flex-1 py-2 rounded-2xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                tab === key
-                  ? 'bg-white text-[#1F4B3C]'
-                  : 'bg-white/40 text-[#8A9A8E]'
+                tab === key ? 'bg-white text-[#1F4B3C]' : 'bg-white/40 text-[#8A9A8E]'
               }`}
             >
               <Icon size={14} />
@@ -706,7 +695,6 @@ export default function ScansPage() {
         </div>
 
         {tab === 'capture' ? (
-          // ───────── 촬영 탭 ─────────
           <div className="flex-1 min-h-0 flex flex-col justify-between py-0.5">
             {captureStep === 'idle' ? (
               <>
@@ -719,16 +707,18 @@ export default function ScansPage() {
                   </p>
                 </div>
 
+                {/* flex 자식의 화면 넘침 방지 */}
                 <div
                   onClick={() => inputRef.current?.click()}
                   className="flex-1 min-h-0 w-full rounded-3xl bg-[#2A2A2A] p-2.5 shadow-xl flex flex-col justify-between my-1 cursor-pointer active:scale-[0.99] transition-transform"
                 >
                   <div className="flex-1 min-h-0 rounded-2xl bg-[#1A1A1A] relative overflow-hidden mb-2">
                     <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
-                      {Array.from({ length: 9 }).map((_, i) => (
-                        <div key={i} className="border border-white/10" />
+                      {Array.from({ length: 9 }).map((_, index) => (
+                        <div key={index} className="border border-white/10" />
                       ))}
                     </div>
+
                     <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-white/40 rounded-tl-lg" />
                     <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-white/40 rounded-tr-lg" />
                     <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-white/40 rounded-bl-lg" />
@@ -745,9 +735,9 @@ export default function ScansPage() {
                   <div className="flex items-center justify-center shrink-0 py-0.5">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        inputRef.current?.click()
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        inputRef.current?.click();
                       }}
                       aria-label="촬영하기"
                       className="w-[50px] h-[50px] rounded-full bg-white flex items-center justify-center active:scale-90 transition-transform shadow-lg cursor-pointer"
@@ -773,6 +763,7 @@ export default function ScansPage() {
                     </p>
                     {isSlotFull && (
                       <button
+                        type="button"
                         onClick={() => setTab('developing')}
                         className="mt-1.5 w-full py-2 rounded-full bg-[#1F4B3C] text-white font-bold text-xs shadow-md active:scale-95 transition-transform cursor-pointer"
                       >
@@ -790,11 +781,12 @@ export default function ScansPage() {
 
                 <div className="w-52 relative z-10 clip-window shrink-0">
                   <div
-                    className={`polaroid-paper bg-[#FAF8F5] shadow-[0_12px_28px_-6px_rgba(0,0,0,0.35)] px-3 pt-3 pb-8 rounded-[2px] border border-[#EFECE6] ${
+                    className={`bg-[#FAF8F5] shadow-[0_12px_28px_-6px_rgba(0,0,0,0.35)] px-3 pt-3 pb-8 rounded-[2px] border border-[#EFECE6] ${
                       !isScanDone ? 'printing-loop' : 'print-done'
                     }`}
                   >
                     <div className="aspect-square bg-[#8FA396] overflow-hidden relative flex items-center justify-center rounded-[1px] shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)]">
+                      {/* 촬영 이미지는 저장하지 않으므로 실루엣으로 대체한다 (Zero-Storage) */}
                       <MonsterSilhouette className="w-3/4 h-3/4 text-white/25 blur-[6px]" />
 
                       <div
@@ -803,11 +795,7 @@ export default function ScansPage() {
                         }`}
                       >
                         <div className="w-10 h-10 rounded-2xl bg-black/35 backdrop-blur-sm border border-white/25 flex items-center justify-center">
-                          <Lock
-                            size={18}
-                            strokeWidth={2.2}
-                            className="text-white/90"
-                          />
+                          <Lock size={18} strokeWidth={2.2} className="text-white/90" />
                         </div>
                         <span className="text-[10px] font-bold text-white/90 drop-shadow">
                           걸으면 인화돼요
@@ -820,9 +808,7 @@ export default function ScansPage() {
                 <div className="mt-3 text-center shrink-0">
                   {!isScanDone ? (
                     <>
-                      <p className="text-sm font-bold text-[#1B1B1B]">
-                        인화 중...
-                      </p>
+                      <p className="text-sm font-bold text-[#1B1B1B]">인화 중...</p>
                       <p className="text-xs text-[#8A9A8E] mt-0.5">
                         몬스터를 분석하고 있어요
                       </p>
@@ -844,15 +830,17 @@ export default function ScansPage() {
                 {isScanDone && (
                   <div className="w-full mt-3 shrink-0 fade-up space-y-1.5">
                     <button
+                      type="button"
                       onClick={() => {
-                        setTab('developing')
-                        setCaptureStep('idle')
+                        setTab('developing');
+                        setCaptureStep('idle');
                       }}
                       className="w-full py-3 rounded-full bg-[#1F4B3C] text-white font-bold text-xs shadow-md active:scale-95 transition-transform cursor-pointer"
                     >
                       인화 대기 목록 보기
                     </button>
                     <button
+                      type="button"
                       onClick={() => setCaptureStep('idle')}
                       className="w-full py-3 rounded-full bg-white text-[#3E7A5C] font-bold text-xs border border-[#DCE8DE] active:scale-95 transition-transform cursor-pointer"
                     >
@@ -864,7 +852,6 @@ export default function ScansPage() {
             )}
           </div>
         ) : (
-          // ───────── 인화 대기 탭 (알이 없을 때도 비어있는 대기 레이아웃 유지) ─────────
           <div className="flex-1 min-h-0 flex flex-col justify-between py-0.5">
             {eggsLoading ? (
               <div className="flex-1 flex items-center justify-center">
@@ -875,18 +862,16 @@ export default function ScansPage() {
                 <p className="text-xs font-bold text-[#C0503D] mb-2">
                   인화 대기 목록을 불러오지 못했어요
                 </p>
-
                 <p className="text-[11px] text-[#8A9A8E] text-center">
                   잠시 후 다시 시도해주세요.
                 </p>
-
                 <button
                   type="button"
                   onClick={() => {
-                    setEggsLoading(true)
-                    void loadEggs()
+                    setEggsLoading(true);
+                    void loadEggs();
                   }}
-                  className="w-full mt-4 py-3 rounded-full bg-[#1F4B3C] text-white font-bold text-xs shadow-md active:scale-95 transition-transform"
+                  className="w-full mt-4 py-3 rounded-full bg-[#1F4B3C] text-white font-bold text-xs shadow-md active:scale-95 transition-transform cursor-pointer"
                 >
                   다시 불러오기
                 </button>
@@ -895,7 +880,7 @@ export default function ScansPage() {
               <div className="flex-1 flex flex-col items-center justify-center py-2">
                 <div className="w-44 max-w-[190px] mb-3 opacity-60">
                   <div className="bg-[#FAF8F5] shadow-[0_8px_20px_-4px_rgba(0,0,0,0.15)] px-2.5 pt-2.5 pb-6 rounded-[2px] border border-[#EFECE6]">
-                    <div className="aspect-square bg-[#E5ECE7] overflow-hidden relative flex items-center justify-center rounded-[1px]">
+                    <div className="aspect-square bg-[#E5ECE7] flex items-center justify-center rounded-[1px]">
                       <Lock size={20} className="text-[#A0B0A4]" />
                     </div>
                   </div>
@@ -904,7 +889,6 @@ export default function ScansPage() {
                 <p className="text-xs font-bold text-[#4B5A50] mb-1">
                   인화 대기 중인 사진이 없어요
                 </p>
-
                 <p className="text-[11px] text-[#8A9A8E] mb-4 text-center">
                   사물을 촬영하고 걸어서
                   <br />
@@ -915,7 +899,6 @@ export default function ScansPage() {
                   <p className="text-[10px] font-bold text-[#4B5A50] mb-1 px-1">
                     인화 대기 슬롯 (0 / {MAX_EGG_SLOTS})
                   </p>
-
                   <div className="grid grid-cols-3 gap-1.5">
                     {Array.from({ length: MAX_EGG_SLOTS }).map((_, index) => (
                       <div
@@ -929,6 +912,7 @@ export default function ScansPage() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => setTab('capture')}
                   className="w-full py-3 rounded-full bg-[#1F4B3C] text-white font-bold text-xs shadow-md active:scale-95 transition-transform cursor-pointer"
                 >
@@ -965,11 +949,7 @@ export default function ScansPage() {
                         {!isReadyToReveal && !isRevealing && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                             <div className="w-9 h-9 rounded-xl bg-black/30 backdrop-blur-sm border border-white/25 flex items-center justify-center shadow-inner">
-                              <Lock
-                                size={15}
-                                strokeWidth={2.2}
-                                className="text-white/90"
-                              />
+                              <Lock size={15} strokeWidth={2.2} className="text-white/90" />
                             </div>
                             <span className="text-[10px] font-bold text-white/90 drop-shadow">
                               인화 중...
@@ -995,31 +975,35 @@ export default function ScansPage() {
                         ? '사진이 드러나고 있어요...'
                         : isReadyToReveal
                           ? '인화가 끝났어요!\n확인해보세요'
-                          : `${((currentEgg?.requiredSteps ?? 0) - (currentEgg?.currentSteps ?? 0)).toLocaleString()}보 더 걸으면\n완성돼요`}
+                          : `${Math.max(
+                              0,
+                              (currentEgg?.requiredSteps ?? 0) -
+                                (currentEgg?.currentSteps ?? 0)
+                            ).toLocaleString()}보 더 걸으면\n완성돼요`}
                     </p>
                   </div>
                 </div>
 
-                {/* 걷는 중 상태 및 걸음 추가 버튼 (+5 / +20 시연용 버튼에 haptic = true 전달) */}
-                {isWalking && !isReadyToReveal && (
+                {isWalking && !isOtherEggWalking && !isReadyToReveal && (
                   <div className="bg-white/70 rounded-2xl p-2 shrink-0 mb-1.5">
                     <div className="flex items-center gap-1.5 mb-1.5 px-1">
                       <Footprints size={12} className="text-[#3E7A5C]" />
-                      <span className="text-[10px] font-bold text-[#4B5A50]">
-                        걷는 중
-                      </span>
+                      <span className="text-[10px] font-bold text-[#4B5A50]">걷는 중</span>
                       <span className="ml-auto text-[10px] text-[#8A9A8E]">
                         이번 {sessionSteps.toLocaleString()}보
                       </span>
                     </div>
+
                     <div className="flex gap-1.5">
                       <button
+                        type="button"
                         onClick={() => addSteps(MANUAL_STEP_SMALL, true)}
                         className="flex-1 py-1.5 bg-white text-[#1F4B3C] font-bold text-[11px] rounded-lg shadow-xs active:scale-95 transition-transform cursor-pointer"
                       >
                         +{MANUAL_STEP_SMALL}보
                       </button>
                       <button
+                        type="button"
                         onClick={() => addSteps(MANUAL_STEP_LARGE, true)}
                         className="flex-1 py-1.5 bg-white text-[#1F4B3C] font-bold text-[11px] rounded-lg shadow-xs active:scale-95 transition-transform cursor-pointer"
                       >
@@ -1035,13 +1019,14 @@ export default function ScansPage() {
                   </p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {Array.from({ length: MAX_EGG_SLOTS }).map((_, index) => {
-                      const egg = eggs[index]
-                      const isSelected = egg?.eggId === selectedEggId
+                      const egg = eggs[index];
+                      const isSelected = egg?.eggId === selectedEggId;
                       const percent = egg
-                        ? Math.round(
-                            (egg.currentSteps / egg.requiredSteps) * 100,
+                        ? Math.min(
+                            100,
+                            Math.round((egg.currentSteps / egg.requiredSteps) * 100)
                           )
-                        : 0
+                        : 0;
 
                       return (
                         <div
@@ -1049,7 +1034,7 @@ export default function ScansPage() {
                           onClick={() =>
                             egg && !isRevealing && setSelectedEggId(egg.eggId)
                           }
-                          className={`h-11 rounded-xl flex flex-col items-center justify-center transition-all ${
+                          className={`h-11 rounded-xl flex flex-col items-center justify-center transition-all relative ${
                             isSelected
                               ? 'bg-white border-2 border-[#1F4B3C] shadow-xs cursor-pointer'
                               : egg
@@ -1063,12 +1048,15 @@ export default function ScansPage() {
                               <span className="text-[9px] font-bold text-[#1B1B1B]">
                                 {percent}%
                               </span>
+                              {egg.activeWalkSessionId && (
+                                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#3E7A5C]" />
+                              )}
                             </>
                           ) : (
                             <Lock size={12} className="text-[#A0B0A4]" />
                           )}
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -1082,14 +1070,24 @@ export default function ScansPage() {
                 <div className="shrink-0 mt-0.5">
                   {isReadyToReveal ? (
                     <button
+                      type="button"
                       disabled={busy || isRevealing}
                       onClick={handleReveal}
                       className="w-full py-3 rounded-full font-bold text-xs bg-[#1F4B3C] text-white shadow-md active:scale-95 transition-transform disabled:opacity-60 cursor-pointer"
                     >
                       {isRevealing ? '사진을 꺼내는 중...' : '몬스터 확인하기'}
                     </button>
+                  ) : isOtherEggWalking ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-3 rounded-full font-bold text-xs bg-white/60 text-[#8A9A8E] border border-[#DCE8DE]"
+                    >
+                      다른 사진이 인화 중이에요
+                    </button>
                   ) : isWalking ? (
                     <button
+                      type="button"
                       disabled={busy}
                       onClick={handleEnd}
                       className="w-full py-3 rounded-full font-bold text-xs bg-white text-[#3E7A5C] border border-[#DCE8DE] active:scale-95 transition-transform disabled:opacity-60 cursor-pointer"
@@ -1098,6 +1096,7 @@ export default function ScansPage() {
                     </button>
                   ) : (
                     <button
+                      type="button"
                       disabled={busy}
                       onClick={handleStart}
                       className="w-full py-3 rounded-full font-bold text-xs bg-[#1F4B3C] text-white shadow-md active:scale-95 transition-transform disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
@@ -1113,11 +1112,11 @@ export default function ScansPage() {
         )}
       </div>
 
-      {/* ───────── 인화 완료 카드 (등급별 RARE/EPIC/COMMON 연출 적용) ───────── */}
       {revealedMonster && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4">
           <div className="w-64 relative card-in flex flex-col items-center z-10">
             <button
+              type="button"
               onClick={() => setRevealedMonster(null)}
               aria-label="닫기"
               className="absolute -top-3 -right-3 z-30 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center active:scale-90 transition-transform text-lg font-bold text-[#1B1B1B] leading-none border border-[#EFECE6] cursor-pointer"
@@ -1125,7 +1124,6 @@ export default function ScansPage() {
               ×
             </button>
 
-            {/* 카드 외곽 컨테이너 (등급별 광택 테두리) */}
             <div
               className={`w-full rounded-[2px] p-[2px] transition-all ${
                 revealedMonster.rarity === 'EPIC'
@@ -1136,7 +1134,6 @@ export default function ScansPage() {
               }`}
             >
               <div className="w-full bg-[#FAF8F5] px-3 pt-3 pb-5 rounded-[2px] border border-[#EFECE6]">
-                {/* 사진 영역: COMMON은 광택 없음, RARE는 은색, EPIC은 금색 광택 적용 */}
                 <div
                   className={`aspect-square bg-[#F2EFE9] overflow-hidden relative flex items-center justify-center rounded-[1px] shadow-[inset_0_1px_4px_rgba(0,0,0,0.15)] ${
                     revealedMonster.rarity === 'EPIC'
@@ -1146,6 +1143,7 @@ export default function ScansPage() {
                         : ''
                   }`}
                 >
+                  {/* 원본 이미지 테두리를 가리기 위해 살짝 확대한다 */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={revealedMonster.imageUrl}
@@ -1160,6 +1158,7 @@ export default function ScansPage() {
                   >
                     {revealedMonster.rarity}
                   </span>
+
                   {isNewMonster && (
                     <span className="absolute top-2 right-2 z-10 text-[9px] font-black text-white bg-[#C84B31] px-2 py-0.5 rounded-full shadow-xs">
                       NEW
@@ -1168,12 +1167,10 @@ export default function ScansPage() {
 
                   <div className="absolute bottom-2 left-2 right-2 z-10 flex gap-1 justify-start">
                     <span className="text-[9px] bg-black/50 backdrop-blur-md text-white rounded-md px-2 py-0.5 font-bold border border-white/20 shadow-xs">
-                      {MATERIAL_LABEL[revealedMonster.material] ??
-                        revealedMonster.material}
+                      {MATERIAL_LABEL[revealedMonster.material] ?? revealedMonster.material}
                     </span>
                     <span className="text-[9px] bg-black/50 backdrop-blur-md text-white rounded-md px-2 py-0.5 font-bold border border-white/20 shadow-xs">
-                      {SHAPE_LABEL[revealedMonster.shape] ??
-                        revealedMonster.shape}
+                      {SHAPE_LABEL[revealedMonster.shape] ?? revealedMonster.shape}
                     </span>
                   </div>
                 </div>
@@ -1187,6 +1184,7 @@ export default function ScansPage() {
             </div>
 
             <button
+              type="button"
               onClick={() => router.push('/collections')}
               className="w-full mt-3 py-3 bg-[#1F4B3C] text-white font-bold text-xs rounded-full active:scale-95 transition-transform shadow-lg cursor-pointer"
             >
@@ -1197,132 +1195,61 @@ export default function ScansPage() {
       )}
 
       <style jsx>{`
-        .clip-window {
-          clip-path: inset(0 -40px -40px -40px);
-        }
+        .clip-window { clip-path: inset(0 -40px -40px -40px); }
 
-        .printing-loop {
-          animation: printMechanical 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        }
+        .printing-loop { animation: printMechanical 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
         @keyframes printMechanical {
-          0% {
-            transform: translateY(-75%);
-          }
-          40% {
-            transform: translateY(-35%);
-          }
-          55% {
-            transform: translateY(-35%);
-          }
-          85% {
-            transform: translateY(-65%);
-          }
-          100% {
-            transform: translateY(-75%);
-          }
+          0%   { transform: translateY(-75%); }
+          40%  { transform: translateY(-35%); }
+          55%  { transform: translateY(-35%); }
+          85%  { transform: translateY(-65%); }
+          100% { transform: translateY(-75%); }
         }
 
-        .print-done {
-          animation: printDone 2.2s cubic-bezier(0.16, 0.84, 0.28, 1) forwards;
-        }
+        .print-done { animation: printDone 2.2s cubic-bezier(0.16, 0.84, 0.28, 1) forwards; }
         @keyframes printDone {
-          0% {
-            transform: translateY(-40%);
-          }
-          75% {
-            transform: translateY(1.5%);
-          }
-          88% {
-            transform: translateY(-0.5%);
-          }
-          100% {
-            transform: translateY(0);
-          }
+          0%   { transform: translateY(-40%); }
+          75%  { transform: translateY(1.5%); }
+          88%  { transform: translateY(-0.5%); }
+          100% { transform: translateY(0); }
         }
 
-        .fade-up {
-          animation: fadeUp 0.5s ease-out forwards;
-        }
+        .fade-up { animation: fadeUp 0.5s ease-out forwards; }
         @keyframes fadeUp {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
 
-        .reveal-pop {
-          animation: revealPop 2.4s ease-in-out forwards;
-        }
+        .reveal-pop { animation: revealPop 2.4s ease-in-out forwards; }
         @keyframes revealPop {
-          0% {
-            transform: scale(1);
-          }
-          30% {
-            transform: scale(1.03);
-          }
-          60% {
-            transform: scale(1.01);
-          }
-          100% {
-            transform: scale(1);
-          }
+          0%   { transform: scale(1); }
+          30%  { transform: scale(1.03); }
+          60%  { transform: scale(1.01); }
+          100% { transform: scale(1); }
         }
 
-        .reveal-in {
-          animation: revealIn 1s ease-out forwards;
-        }
+        /* reveal 최종 scale은 이미지의 기본 scale(1.18)과 맞춘다 */
+        .reveal-in { animation: revealIn 1s ease-out forwards; }
         @keyframes revealIn {
-          from {
-            opacity: 0;
-            filter: blur(12px);
-            transform: scale(1.3);
-          }
-          to {
-            opacity: 1;
-            filter: blur(0);
-            transform: scale(1.18);
-          }
+          from { opacity: 0; filter: blur(12px); transform: scale(1.3); }
+          to   { opacity: 1; filter: blur(0); transform: scale(1.18); }
         }
 
-        .card-in {
-          animation: cardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
+        .card-in { animation: cardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
         @keyframes cardPop {
-          0% {
-            opacity: 0;
-            transform: scale(0.85) translateY(20px);
-          }
-          100% {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
+          0%   { opacity: 0; transform: scale(0.85) translateY(20px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* [RARE] 은색 테두리 */
         .rare-silver {
-          background: linear-gradient(
-            135deg,
-            #a8b8cc 0%,
-            #e8eef5 50%,
-            #8fa5bc 100%
-          );
+          background: linear-gradient(135deg, #a8b8cc 0%, #e8eef5 50%, #8fa5bc 100%);
         }
-        /* [RARE] 사진 안쪽 은색 광택 */
-        .rare-inner-shine {
-          position: relative;
-          overflow: hidden;
-        }
+        .rare-inner-shine { position: relative; overflow: hidden; }
         .rare-inner-shine::after {
           content: '';
           position: absolute;
-          top: -50%;
-          left: -50%;
-          width: 200%;
-          height: 200%;
+          top: -50%; left: -50%;
+          width: 200%; height: 200%;
           background: linear-gradient(
             60deg,
             transparent 35%,
@@ -1332,27 +1259,15 @@ export default function ScansPage() {
           animation: shimmer 1.5s ease-in-out infinite;
         }
 
-        /* [EPIC] 금색 테두리 */
         .epic-gold-shimmer {
-          background: linear-gradient(
-            135deg,
-            #d4af37 0%,
-            #fff8e7 50%,
-            #aa771c 100%
-          );
+          background: linear-gradient(135deg, #d4af37 0%, #fff8e7 50%, #aa771c 100%);
         }
-        /* [EPIC] 사진 안쪽 화려한 금빛 광택 */
-        .epic-inner-shine {
-          position: relative;
-          overflow: hidden;
-        }
+        .epic-inner-shine { position: relative; overflow: hidden; }
         .epic-inner-shine::after {
           content: '';
           position: absolute;
-          top: -50%;
-          left: -50%;
-          width: 200%;
-          height: 200%;
+          top: -50%; left: -50%;
+          width: 200%; height: 200%;
           background: linear-gradient(
             60deg,
             transparent 25%,
@@ -1365,27 +1280,17 @@ export default function ScansPage() {
         }
 
         @keyframes shimmer {
-          0% {
-            transform: translateX(-100%) translateY(-100%);
-          }
-          100% {
-            transform: translateX(100%) translateY(100%);
-          }
+          0%   { transform: translateX(-100%) translateY(-100%); }
+          100% { transform: translateX(100%) translateY(100%); }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .printing-loop,
-          .print-done,
-          .fade-up,
-          .reveal-pop,
-          .reveal-in,
-          .card-in,
-          .rare-inner-shine::after,
-          .epic-inner-shine::after {
+          .printing-loop, .print-done, .fade-up, .reveal-pop, .reveal-in, .card-in,
+          .rare-inner-shine::after, .epic-inner-shine::after {
             animation: none;
           }
         }
       `}</style>
     </div>
-  )
+  );
 }
