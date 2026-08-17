@@ -12,6 +12,7 @@ export const ERROR = {
     INVALID_REQUEST: {code: 40002, message: "요청 형식이 올바르지 않습니다"},
     INVALID_IMAGE: {code: 40003, message: "지원하지 않는 이미지 형식입니다 (jpeg/png/webp만 가능)"},
     BATTLE_PARAM_REQUIRED: {code: 40004, message: "전투 결과 기록에 필요한 필수 데이터가 누락되었습니다"},
+    INVALID_BATTLE_RESULT: {code: 40005, message: "전투 결과 검증에 실패했습니다"},
 
     // 401
     UNAUTHORIZED: {code: 40100, message: "세션이 유효하지 않습니다"},
