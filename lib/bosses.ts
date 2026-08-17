@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { calculateFinalStats } from "@/lib/stats";
 import {
   BossNotFoundError,
-  UserMonsterNotFoundError,
   InvalidBattleResultError,
 } from "@/lib/errors/bosses";
+import { UserMonsterNotFoundError } from "@/lib/errors/user-monsters";
 
 // 매직 넘버 상수화
 const DEFAULT_TIME_LIMIT_MS = 30000;
@@ -70,14 +70,15 @@ export async function processBossBattle(input: ProcessBattleInput) {
 
   // 어뷰징 및 데이터 검증
   const TIME_LIMIT_MS = boss.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS;
+  const maxAllowedTime = TIME_LIMIT_MS + TIME_LIMIT_BUFFER_MS;
 
   // 크리티컬 횟수 초과 검증
   if (criticalCount > touchCount) {
     throw new InvalidBattleResultError();
   }
 
-  // 제한시간 초과 검증
-  if (elapsedMs > TIME_LIMIT_MS + TIME_LIMIT_BUFFER_MS) {
+  // 제한시간 초과 검증 (상단 정의된 maxAllowedTime 재사용)
+  if (elapsedMs > maxAllowedTime) {
     throw new InvalidBattleResultError();
   }
 
@@ -121,7 +122,6 @@ export async function processBossBattle(input: ProcessBattleInput) {
   );
 
   const bossHpRemaining = Math.max(0, boss.hp - totalDamage);
-  const maxAllowedTime = TIME_LIMIT_MS + TIME_LIMIT_BUFFER_MS;
   const isCleared = bossHpRemaining === 0 && elapsedMs <= maxAllowedTime;
   const startedAt = new Date(Date.now() - elapsedMs);
 
