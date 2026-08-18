@@ -42,7 +42,9 @@ export async function getActiveBossById(bossId: bigint) {
     timeLimitMs: boss.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS,
     weakAttribute: boss.weakAttribute,
     strongAttribute: boss.strongAttribute,
+    imageUrl: boss.imageUrl,
     cutoutImageUrl: boss.cutoutImageUrl ?? null,
+    bgImageUrl: boss.bgImageUrl ?? null,
   };
 }
 
