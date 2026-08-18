@@ -26,7 +26,7 @@ const CRITICAL_MULTIPLIER = 1.5;
  * 현재 MVP는 보스 1종 기준.
  * 추후 활성 보스 조회 API가 별도로 생기면 제거/변경 가능.
  */
-const BOSS_ID = '3';
+const BOSS_ID = '1';
 
 interface Stats {
   hp: number;
@@ -60,6 +60,7 @@ interface UserMonster {
 
 interface BossApiData {
   id: string;
+  dexId: number;
   name: string;
   hp: number;
   timeLimitMs: number;
@@ -375,8 +376,10 @@ export default function BossPage() {
 
         const loadedBoss: BossState = {
           ...data,
+          dexId: data.dexId ?? Number(BOSS_ID),
           maxHp: data.hp,
           currentHp: data.hp,
+          bgImageUrl: data.bgImageUrl || null,
         };
 
         setBoss(loadedBoss);
@@ -478,7 +481,7 @@ export default function BossPage() {
 
       try {
         const res = await fetch(
-          `/api/bosses/${boss.id}`,
+          `/api/bosses/${boss.dexId}`,
           {
             method: 'POST',
 
@@ -1006,14 +1009,13 @@ export default function BossPage() {
 
   const selectedMultiplier = boss ? getDamageMultiplier(selectedMonster) : 1;
 
-  // DB/API 이미지를 우선 사용하고, 값이 없을 때는 기존 로컬 이미지를 사용합니다.
-  const bossBackgroundUrl =
-    boss?.bgImageUrl || '/images/boss-bg.jpg';
+  // DB/API 이미지를 우선 사용하고, 값이 없을 때는 undefined 처리
+  const bossBackgroundUrl = boss?.bgImageUrl || undefined;
 
   const bossCutoutUrl =
     boss?.cutoutImageUrl ||
     boss?.imageUrl ||
-    '/images/boss.png';
+    undefined;
 
   /**
    * 실제 전투 중이고
@@ -1137,10 +1139,7 @@ export default function BossPage() {
       <div
         className="absolute inset-0 bg-cover bg-center pointer-events-none scale-[1.02]"
         style={{
-          // 원격 배경이 깨져도 기존 로컬 배경이 뒤에서 표시됩니다.
-          backgroundImage: boss.bgImageUrl
-            ? `url("${bossBackgroundUrl}"), url("/images/boss-bg.jpg")`
-            : `url("/images/boss-bg.jpg")`,
+          backgroundImage: bossBackgroundUrl ? `url("${bossBackgroundUrl}")` : undefined,
         }}
       />
 

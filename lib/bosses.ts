@@ -26,9 +26,12 @@ export interface ProcessBattleInput {
 }
 
 // 활성화된 보스 단건 조회
-export async function getActiveBossById(bossId: bigint) {
+export async function getActiveBossByDexId(dexId: number) {
   const boss = await prisma.boss.findFirst({
-    where: { id: bossId, isActive: true },
+    where: {
+      dexId: dexId,
+      isActive: true,
+    },
   });
 
   if (!boss) {
@@ -37,6 +40,7 @@ export async function getActiveBossById(bossId: bigint) {
 
   return {
     id: boss.id.toString(),
+    dexId: boss.dexId,
     name: boss.name,
     hp: boss.hp,
     timeLimitMs: boss.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS,
@@ -79,7 +83,7 @@ export async function processBossBattle(input: ProcessBattleInput) {
     throw new InvalidBattleResultError();
   }
 
-  // 제한시간 초과 검증 (상단 정의된 maxAllowedTime 재사용)
+  // 제한시간 초과 검증
   if (elapsedMs > maxAllowedTime) {
     throw new InvalidBattleResultError();
   }
