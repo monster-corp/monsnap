@@ -11,6 +11,7 @@ export const ERROR = {
     INVALID_NICKNAME: {code: 40001, message: "닉네임은 2~12자의 한글/영문/숫자만 가능합니다"},
     INVALID_REQUEST: {code: 40002, message: "요청 형식이 올바르지 않습니다"},
     INVALID_IMAGE: {code: 40003, message: "지원하지 않는 이미지 형식입니다 (jpeg/png/webp만 가능)"},
+    INVALID_BATTLE_RESULT: {code: 40004, message: "전투 결과 검증에 실패했습니다"},
 
     // 401
     UNAUTHORIZED: {code: 40100, message: "세션이 유효하지 않습니다"},
@@ -19,6 +20,7 @@ export const ERROR = {
     EGG_NOT_FOUND: {code: 40400, message: "해당 알을 찾을 수 없습니다"},
     WALK_SESSION_NOT_FOUND: {code: 40401, message: "해당 워크 세션을 찾을 수 없습니다"},
     USER_MONSTER_NOT_FOUND: {code: 40402, message: "보유하지 않은 몬스터입니다"},
+    BOSS_NOT_FOUND: {code: 40403, message: "해당 보스를 찾을 수 없습니다"},
 
     // 409
     EGG_SLOT_FULL: {code: 40900, message: "알 보관함이 가득 찼습니다"},
