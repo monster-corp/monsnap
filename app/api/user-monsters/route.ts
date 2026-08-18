@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
                     material: um.monster.material,
                     shape: um.monster.shape,
                     imageUrl: um.monster.imageUrl,
+                    cutoutImageUrl: um.monster.cutoutImageUrl ?? null,
                     level: um.level,
                     catchCount: um.catchCount,
                     firstCaughtAt: um.firstCaughtAt.toISOString(),

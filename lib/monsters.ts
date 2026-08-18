@@ -12,6 +12,7 @@ export async function getMonsterDex(userId: bigint) {
             material: true,
             shape: true,
             imageUrl: true,
+            cutoutImageUrl: true,
             isFallback: true,
             baseHp: true,
             baseAttack: true,
@@ -53,6 +54,7 @@ export function toCaughtDexEntry(m: DexMonster) {
         material: m.material,
         shape: m.shape,
         imageUrl: m.imageUrl,
+        cutoutImageUrl: m.cutoutImageUrl ?? null,
         isFallback: m.isFallback,
         baseStats: {
             hp: m.baseHp,
