@@ -395,6 +395,13 @@ export default function BossPage() {
 
       // 몬스터 API 통신/응답 실패 시
       if (!monstersRes.ok || monstersBody?.code !== ERROR.OK.code) {
+        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+        const serverMessage = monstersBody?.message;
+        if (serverMessage) {
+          setLoadError(serverMessage);
+          return;
+        }
+        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
         throw new ApiError("INTERNAL_ERROR");
       }
 
