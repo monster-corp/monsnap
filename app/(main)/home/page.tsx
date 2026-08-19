@@ -36,6 +36,9 @@ type UserMonsterItem = {
 };
 
 export default function HomePage() {
+  // error, setError 상태 선언 추가
+  const [error, setError] = useState<string | null>(null);
+
   // /api/users 연동 전/실패 시 fallback
   const [nickname, setNickname] =
     useState('새내기 탐험가');
@@ -81,6 +84,10 @@ export default function HomePage() {
   // ─────────────────────
   useEffect(() => {
     async function fetchLobbyData() {
+
+      // 요청 시작 시 기존 에러 상태 초기화 (재시도 케이스 대응)
+      setError(null);
+
       try {
         // ─────────────────────
         // 1. 현재 사용자 정보
@@ -90,6 +97,13 @@ export default function HomePage() {
           const userData = await userRes.json().catch(() => null);
 
           if (!userRes.ok || userData?.code !== ERROR.OK.code) {
+            // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+            const serverMessage = userData?.message;
+            if (serverMessage) {
+              setError(serverMessage);
+              return;
+            }
+            // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
             throw new ApiError("INTERNAL_ERROR");
           }
 
@@ -114,6 +128,13 @@ export default function HomePage() {
           const monsterData = await monsterRes.json().catch(() => null);
 
           if (!monsterRes.ok || monsterData?.code !== ERROR.OK.code) {
+            // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+            const serverMessage = monsterData?.message;
+            if (serverMessage) {
+              setError(serverMessage);
+              return;
+            }
+            // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
             throw new ApiError("INTERNAL_ERROR");
           }
 
