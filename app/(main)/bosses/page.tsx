@@ -10,14 +10,14 @@ import React, {
 import Link from 'next/link';
 import { Menu, Swords, Trophy, X } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { BossNotFoundError, InvalidBattleResultError } from "@/lib/errors/bosses";
+import { ApiError, ERROR, respondWithStatus } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 const CRITICAL_RATE = 0.2;
 const CRITICAL_MULTIPLIER = 1.5;
@@ -369,7 +369,7 @@ export default function BossPage() {
 
       if (
         bossRes.ok &&
-        bossBody?.code === CODE_OK &&
+        bossBody?.code === ERROR.OK.code &&
         bossBody?.data
       ) {
         const data = bossBody.data as BossApiData;
@@ -386,47 +386,38 @@ export default function BossPage() {
 
         setRemainingMs(data.timeLimitMs);
       } else {
-        throw new Error(
-          bossBody?.message ??
-            '보스 정보를 불러오지 못했어요.'
-        );
+        throw new BossNotFoundError();
       }
 
       // ----------------------------------------------------------
       // 유저 몬스터 데이터
       // ----------------------------------------------------------
 
-      if (
-        !monstersRes.ok ||
-        monstersBody?.code !== CODE_OK
-      ) {
-        throw new Error(
-          monstersBody?.message ??
-            '보유 몬스터를 불러오지 못했어요.'
-        );
+      // 몬스터 API 통신/응답 실패 시
+      if (!monstersRes.ok || monstersBody?.code !== ERROR.OK.code) {
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       const list =
         monstersBody.data?.userMonsters;
 
+      // 몬스터 응답 데이터 규격 이상 시
       if (!Array.isArray(list)) {
-        throw new Error(
-          '보유 몬스터 응답 형식이 올바르지 않습니다.'
-        );
+        throw new ApiError("INVALID_REQUEST");
       }
 
       setMyMonsters(list);
     } catch (error) {
-      console.error(
-        '[보스전] 초기 데이터 조회 실패:',
-        error
-      );
-
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : '전투 정보를 불러오지 못했어요.'
-      );
+      if (error instanceof ApiError) {
+        console.error(`[/api/bosses] ApiError (${error.key} / ${error.code}):`, error.message);
+        setLoadError(error.message);
+      } else if (error instanceof Error) {
+        console.error("[/api/bosses] unexpected error:", error.message);
+        setLoadError(error.message);
+      } else {
+        console.error("[/api/bosses] unknown error:", error);
+        setLoadError(ERROR.INTERNAL_ERROR.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -500,51 +491,36 @@ export default function BossPage() {
 
         if (
           !res.ok ||
-          body?.code !== CODE_OK ||
+          body?.code !== ERROR.OK.code ||
           !body?.data
         ) {
-          throw new Error(
-            body?.message ??
-              '전투 결과를 확인하지 못했어요.'
-          );
+          throw new InvalidBattleResultError();
         }
 
-        const result =
-          body.data as BattleResult;
+        const result = body.data as BattleResult;
 
         setBattleResult(result);
-
-        setResultState(
-          result.isCleared
-            ? 'victory'
-            : 'failure'
-        );
-
+        setResultState(result.isCleared ? 'victory' : 'failure');
         setShowNavigation(true);
       } catch (error) {
-        console.error(
-          '[보스전] 결과 저장 실패:',
-          error
-        );
-
-        setResultError(
-          error instanceof Error
-            ? error.message
-            : '전투 결과 저장에 실패했어요.'
-        );
+        if (error instanceof ApiError) {
+          console.error(`[/api/bosses] ApiError (${error.key} / ${error.code}):`, error.message);
+          setResultError(error.message);
+        } else if (error instanceof Error) {
+          console.error("[/api/bosses] unexpected error:", error.message);
+          setResultError(error.message);
+        } else {
+          console.error("[/api/bosses] unknown error:", error);
+          setResultError(ERROR.INTERNAL_ERROR.message);
+        }
 
         setResultState('error');
-
         setShowNavigation(true);
       } finally {
         submittingRef.current = false;
       }
     },
-    [
-      boss,
-      getDamageMultiplier,
-      selectedMonster,
-    ]
+    [ boss, getDamageMultiplier, selectedMonster ]
   );
 
   // ==============================================================
