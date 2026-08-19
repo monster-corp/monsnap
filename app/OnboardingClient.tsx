@@ -234,64 +234,58 @@ export default function OnboardingClient() {
     !submitting &&
     !isComposing;
 
-  const handleSubmit =
-    async () => {
-      if (!canSubmit) {
-        return;
+  const handleSubmit = async () => {
+    if (!canSubmit) {
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nickname: normalizedNickname,
+        }),
+      });
+
+      const body = await res.json().catch(() => null);
+
+      // 서버 응답이 OK가 아닐 경우 처리
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        const serverMessage = body?.message;
+        if (serverMessage) {
+          setSubmitError(serverMessage);
+          setSubmitting(false); // 실패 시 제출 버튼 재활성화
+          return;
+        }
+        throw new ApiError('INTERNAL_ERROR');
       }
 
-      setSubmitting(true);
-      setSubmitError(null);
-
-      try {
-        const res = await fetch(
-          '/api/users',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              nickname:
-                normalizedNickname,
-            }),
-          }
+      // 성공 시에는 setSubmitting(false)를 실행하지 않고 페이지 전환
+      router.push(SCANS_PATH);
+      router.refresh();
+    } catch (error) {
+      if (error instanceof ApiError) {
+        console.error(
+          `[/api/users] ApiError (${error.key} / ${error.code}):`,
+          error.message
         );
-
-        const body = await res.json()
-          .catch(() => null);
-
-        // 서버 응답이 OK가 아닐 경우 처리
-        if (!res.ok || body?.code !== ERROR.OK.code) {
-          const serverMessage = body?.message;
-          if (serverMessage) {
-            setSubmitError(serverMessage);
-            return;
-          }
-          throw new ApiError('INTERNAL_ERROR');
-        }
-
-        router.push(SCANS_PATH);
-        router.refresh();
-      } catch (error) {
-        if (error instanceof ApiError) {
-          console.error(
-            `[/api/users] ApiError (${error.key} / ${error.code}):`,
-            error.message
-          );
-          setSubmitError(error.message);
-        } else if (error instanceof Error) {
-          console.error(`[/api/users] unexpected error:`, error.message);
-          setSubmitError(ERROR.INTERNAL_ERROR.message);
-        } else {
-          console.error(`[/api/users] unknown error:`, error);
-          setSubmitError(ERROR.INTERNAL_ERROR.message);
-        }
-      } finally {
-        setSubmitting(false);
+        setSubmitError(error.message);
+      } else if (error instanceof Error) {
+        console.error(`[/api/users] unexpected error:`, error.message);
+        setSubmitError(ERROR.INTERNAL_ERROR.message);
+      } else {
+        console.error(`[/api/users] unknown error:`, error);
+        setSubmitError(ERROR.INTERNAL_ERROR.message);
       }
-    };
+      setSubmitting(false); // 에러 발생 시 제출 버튼 재활성화
+    }
+  };
 
   return (
     <div

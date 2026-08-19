@@ -233,41 +233,36 @@ export default function MissionsPage() {
 
   const loadMissions = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(null); // 재시도 및 성공 경로를 위해 초기화
 
     try {
       const res = await fetch('/api/missions');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+      // ERROR 모듈 대신 문자열 'OK' 직접 비교
+      if (!res.ok || body?.code !== 'OK') {
+        // 세션 만료 등 서버가 전달한 메시지가 있으면 UI에 최우선 노출
         const serverMessage = body?.message;
         if (serverMessage) {
           setError(serverMessage);
           return;
         }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-        throw new ApiError("INTERNAL_ERROR");
+        setError('미션을 불러오지 못했습니다.');
+        return;
       }
 
       const list = body.data?.missions;
 
       if (!Array.isArray(list)) {
-        throw new ApiError("INVALID_REQUEST");
+        setError('올바르지 않은 데이터 형식입니다.');
+        return;
       }
 
       setMissions(list);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(`[/api/missions] ApiError (${error.key} / ${error.code}):`, error.message);
-        setError(error.message);
-      } else if (error instanceof Error) {
-        console.error("[/api/missions] unexpected error:", error.message);
-        setError(error.message);
-      } else {
-        console.error("[/api/missions] unknown error:", error);
-        setError(ERROR.INTERNAL_ERROR.message);
-      }
+    } catch (err) {
+      console.error('[/api/missions] unexpected error:', err);
+      // "Failed to fetch" 등 영문 원문 노출 방지를 위한 마스킹
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }

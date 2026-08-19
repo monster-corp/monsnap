@@ -350,23 +350,15 @@ export default function BossPage() {
     try {
       const [bossRes, monstersRes] = await Promise.all([
         fetch(`/api/bosses/${BOSS_ID}`),
-        fetch(
-          '/api/user-monsters?sort=dexId&order=asc'
-        ),
+        fetch('/api/user-monsters?sort=dexId&order=asc'),
       ]);
 
-      const bossBody = await bossRes
-        .json()
-        .catch(() => null);
-
-      const monstersBody = await monstersRes
-        .json()
-        .catch(() => null);
+      const bossBody = await bossRes.json().catch(() => null);
+      const monstersBody = await monstersRes.json().catch(() => null);
 
       // ----------------------------------------------------------
       // 보스 데이터
       // ----------------------------------------------------------
-
       if (
         bossRes.ok &&
         bossBody?.code === ERROR.OK.code &&
@@ -383,39 +375,48 @@ export default function BossPage() {
         };
 
         setBoss(loadedBoss);
-
         setRemainingMs(data.timeLimitMs);
       } else {
-        throw new BossNotFoundError();
+        // 1) 서버에서 전달된 메시지가 있다면 최우선으로 UI 노출
+        const serverMessage = bossBody?.message;
+        if (serverMessage) {
+          setLoadError(serverMessage);
+          return;
+        }
+
+        // 2) 404 응답일 경우에만 BossNotFoundError 투척
+        if (bossRes.status === 404) {
+          throw new BossNotFoundError();
+        }
+
+        // 3) 그 외 알 수 없는 서버 에러일 경우 INTERNAL_ERROR 예외 투척
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       // ----------------------------------------------------------
       // 유저 몬스터 데이터
       // ----------------------------------------------------------
-
-      // 몬스터 API 통신/응답 실패 시
       if (!monstersRes.ok || monstersBody?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
         const serverMessage = monstersBody?.message;
         if (serverMessage) {
           setLoadError(serverMessage);
           return;
         }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
         throw new ApiError("INTERNAL_ERROR");
       }
 
-      const list =
-        monstersBody.data?.userMonsters;
+      const list = monstersBody.data?.userMonsters;
 
-      // 몬스터 응답 데이터 규격 이상 시
       if (!Array.isArray(list)) {
         throw new ApiError("INVALID_REQUEST");
       }
 
       setMyMonsters(list);
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof BossNotFoundError) {
+        console.error(`[/api/bosses] BossNotFoundError:`, error.message);
+        setLoadError(error.message);
+      } else if (error instanceof ApiError) {
         console.error(`[/api/bosses] ApiError (${error.key} / ${error.code}):`, error.message);
         setLoadError(error.message);
       } else if (error instanceof Error) {

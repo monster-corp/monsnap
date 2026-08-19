@@ -185,14 +185,9 @@ export default function ScansPage() {
       const body = await res.json().catch(() => null);
 
       if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
-        const serverMessage = body?.message;
-        if (serverMessage) {
-          setEggError(serverMessage);
-          return;
-        }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-        throw new ApiError("INTERNAL_ERROR");
+        // 서버에서 전달된 메시지가 있으면 사용하고, 없으면 기본 에러 메시지 노출
+        setEggError(body?.message ?? ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
       const list = body.data?.eggs;
@@ -250,27 +245,6 @@ export default function ScansPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadEggs();
-  }, [loadEggs]);
-
-  // 활성 세션의 미전송 걸음 수를 복원한다
-  useEffect(() => {
-    if (!activeSessionId) {
-      localStepsRef.current = 0;
-      lastSentRef.current = 0;
-      setSessionSteps(0);
-      return;
-    }
-
-    const saved = Number(
-      localStorage.getItem(STEPS_STORAGE_PREFIX + activeSessionId) ?? 0
-    );
-    localStepsRef.current = Number.isFinite(saved) ? saved : 0;
-    lastSentRef.current = 0;
-    setSessionSteps(localStepsRef.current);
-  }, [activeSessionId]);
-
   // 누적값 동기화라 일시 실패 후 다음 주기에 재전송할 수 있다
   const syncSteps = useCallback(async (): Promise<boolean> => {
     if (!walkingEgg?.activeWalkSessionId) return true;
@@ -294,29 +268,20 @@ export default function ScansPage() {
       );
       const body = await res.json().catch(() => null);
 
-      // 만료/종료된 세션이면 로컬 키를 지우고 서버 상태로 재동기화한다
+      // 만료/종료된 세션이면 로컬 키를 지우고 기존 행동 유도 문구를 노출한다
       if (
         body?.code === ERROR.WALK_SESSION_NOT_FOUND.code ||
         body?.code === ERROR.SESSION_NOT_ACTIVE.code
       ) {
         localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
         await loadEggs();
-        throw new ApiError(
-          body.code === ERROR.WALK_SESSION_NOT_FOUND.code
-            ? "WALK_SESSION_NOT_FOUND"
-            : "SESSION_NOT_ACTIVE"
-        );
+        setEggError('걷기 세션이 종료되었어요. 다시 시작해주세요.');
+        return false;
       }
 
       if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
-        const serverMessage = body?.message;
-        if (serverMessage) {
-          setEggError(serverMessage);
-          return false;
-        }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-        throw new ApiError("INTERNAL_ERROR");
+        setEggError(body?.message ?? ERROR.INTERNAL_ERROR.message);
+        return false;
       }
 
       const egg = body.data?.egg;

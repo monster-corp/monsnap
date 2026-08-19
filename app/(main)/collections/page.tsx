@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
-import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
@@ -80,44 +79,38 @@ export default function CollectionsPage() {
 
   const loadDex = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(null); // 재시도 및 성공 경로를 위해 초기화
 
     try {
       const res = await fetch('/api/monsters');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+      // 서버 에러 모듈(ERROR) 제거 후 문자열 직접 비교
+      if (!res.ok || body?.code !== 'OK') {
         const serverMessage = body?.message;
         if (serverMessage) {
-          setError(serverMessage);
+          setError(serverMessage); // 서버 커스텀 에러 메시지 노출
           return;
         }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-        throw new ApiError("INTERNAL_ERROR");
+        setError('몬스터 도감 정보를 불러오지 못했습니다.');
+        return;
       }
 
       const list = body.data?.monsters;
 
       if (!Array.isArray(list)) {
-        throw new ApiError("INVALID_REQUEST");
+        setError('올바르지 않은 데이터 형식입니다.');
+        return;
       }
 
       // 정렬은 서버가 처리한다 (lib/monsters.ts: EPIC → RARE → COMMON, 등급 내 dexId 순)
       setMonsters(list);
       setTotalCount(body.data?.totalCount ?? 0);
       setCaughtCount(body.data?.caughtCount ?? 0);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(`[/api/monsters] ApiError (${error.key} / ${error.code}):`, error.message);
-        setError(error.message);
-      } else if (error instanceof Error) {
-        console.error("[/api/monsters] unexpected error:", error.message);
-        setError(error.message);
-      } else {
-        console.error("[/api/monsters] unknown error:", error);
-        setError(ERROR.INTERNAL_ERROR.message);
-      }
+    } catch (err) {
+      console.error('[/api/monsters] unexpected error:', err);
+      // "Failed to fetch" 원문 노출 방지를 위한 한국어 마스킹
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }

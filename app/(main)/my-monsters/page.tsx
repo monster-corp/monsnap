@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
-import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
@@ -120,9 +119,7 @@ function MonsterSilhouette({
 
 export default function MyMonstersPage() {
   const [monsters, setMonsters] = useState<UserMonster[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    null
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('dexId');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -145,7 +142,7 @@ export default function MyMonstersPage() {
       SORT_OPTIONS[0];
 
     setLoading(true);
-    setError(null);
+    setError(null); // 정렬/재시도 시 에러 화면 초기화
 
     try {
       const res = await fetch(
@@ -154,35 +151,27 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+      if (!res.ok || body?.code !== 'OK') {
         const serverMessage = body?.message;
         if (serverMessage) {
-          setError(serverMessage);
+          setError(serverMessage); // 세션 만료 등 서버 커스텀 에러 표시
           return;
         }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-        throw new ApiError("INTERNAL_ERROR");
+        setError('보유 몬스터 목록을 불러오지 못했습니다.');
+        return;
       }
 
       const list = body.data?.userMonsters;
 
       if (!Array.isArray(list)) {
-        throw new ApiError("INVALID_REQUEST");
+        setError('올바르지 않은 데이터 형식입니다.');
+        return;
       }
 
       setMonsters(list);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(`[/api/user-monsters] ApiError (${error.key} / ${error.code}):`, error.message);
-        setError(error.message);
-      } else if (error instanceof Error) {
-        console.error("[/api/user-monsters] unexpected error:", error.message);
-        setError(error.message);
-      } else {
-        console.error("[/api/user-monsters] unknown error:", error);
-        setError(ERROR.INTERNAL_ERROR.message);
-      }
+    } catch (err) {
+      console.error('[/api/user-monsters] unexpected error:', err);
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
@@ -203,7 +192,7 @@ export default function MyMonstersPage() {
     if (busy) return;
 
     setBusy(true);
-    setError(null);
+    setError(null); // IV 판정 요청 시 기존 에러 초기화
 
     try {
       const res = await fetch(
@@ -219,29 +208,20 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+      if (!res.ok || body?.code !== 'OK') {
         const serverMessage = body?.message;
         if (serverMessage) {
           setError(serverMessage);
           return;
         }
-        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-        throw new ApiError("INTERNAL_ERROR");
+        setError('개체값 판정 처리에 실패했습니다.');
+        return;
       }
 
       await loadMonsters();
-    } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(`[/api/user-monsters/${userMonsterId}/iv] ApiError (${error.key} / ${error.code}):`, error.message);
-        setError(error.message);
-      } else if (error instanceof Error) {
-        console.error(`[/api/user-monsters/${userMonsterId}/iv] unexpected error:`, error.message);
-        setError(error.message);
-      } else {
-        console.error(`[/api/user-monsters/${userMonsterId}/iv] unknown error:`, error);
-        setError(ERROR.INTERNAL_ERROR.message);
-      }
+    } catch (err) {
+      console.error(`[/api/user-monsters/${userMonsterId}/iv] error:`, err);
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(false);
     }
