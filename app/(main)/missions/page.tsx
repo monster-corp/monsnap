@@ -13,14 +13,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 type Tab = 'daily' | 'weekly';
 
@@ -240,22 +239,28 @@ export default function MissionsPage() {
       const res = await fetch('/api/missions');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(body?.message ?? '미션을 불러오지 못했어요.');
-        return;
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       const list = body.data?.missions;
 
       if (!Array.isArray(list)) {
-        console.error('[미션] 예상하지 못한 응답 구조:', body);
-        setError('미션을 불러오지 못했어요.');
-        return;
+        throw new ApiError("INVALID_REQUEST");
       }
 
       setMissions(list);
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        console.error(`[/api/missions] ApiError (${error.key} / ${error.code}):`, error.message);
+        setError(error.message);
+      } else if (error instanceof Error) {
+        console.error("[/api/missions] unexpected error:", error.message);
+        setError(error.message);
+      } else {
+        console.error("[/api/missions] unknown error:", error);
+        setError(ERROR.INTERNAL_ERROR.message);
+      }
     } finally {
       setLoading(false);
     }
