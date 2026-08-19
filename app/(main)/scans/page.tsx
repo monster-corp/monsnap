@@ -185,6 +185,13 @@ export default function ScansPage() {
       const body = await res.json().catch(() => null);
 
       if (!res.ok || body?.code !== ERROR.OK.code) {
+        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+        const serverMessage = body?.message;
+        if (serverMessage) {
+          setEggError(serverMessage);
+          return;
+        }
+        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
         throw new ApiError("INTERNAL_ERROR");
       }
 
@@ -274,6 +281,8 @@ export default function ScansPage() {
     // 서버는 감소한 누적값을 거부하므로 증가했을 때만 전송한다
     if (steps <= lastSentRef.current) return true;
 
+    setEggError(null);
+
     try {
       const res = await fetch(
         `/api/eggs/${walkingEgg.eggId}/walk-sessions/${sessionId}`,
@@ -300,6 +309,13 @@ export default function ScansPage() {
       }
 
       if (!res.ok || body?.code !== ERROR.OK.code) {
+        // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
+        const serverMessage = body?.message;
+        if (serverMessage) {
+          setEggError(serverMessage);
+          return false;
+        }
+        // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
         throw new ApiError("INTERNAL_ERROR");
       }
 

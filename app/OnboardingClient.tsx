@@ -259,8 +259,7 @@ export default function OnboardingClient() {
           }
         );
 
-        const body = await res
-          .json()
+        const body = await res.json()
           .catch(() => null);
 
         // 서버 응답이 OK가 아닐 경우 처리
