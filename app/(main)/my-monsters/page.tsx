@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 // 서버가 지원하는 정렬 기준 (lib/user-monsters.ts의 SORT_FIELDS)
 const SORT_OPTIONS = [
@@ -154,29 +153,28 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(
-          body?.message ??
-            '보유 몬스터를 불러오지 못했어요.'
-        );
-        return;
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       const list = body.data?.userMonsters;
 
       if (!Array.isArray(list)) {
-        console.error(
-          '[내 몬스터] 예상하지 못한 응답 구조:',
-          body
-        );
-        setError('보유 몬스터를 불러오지 못했어요.');
-        return;
+        throw new ApiError("INVALID_REQUEST");
       }
 
       setMonsters(list);
-      setError(null);
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        console.error(`[/api/user-monsters] ApiError (${error.key} / ${error.code}):`, error.message);
+        setError(error.message);
+      } else if (error instanceof Error) {
+        console.error("[/api/user-monsters] unexpected error:", error.message);
+        setError(error.message);
+      } else {
+        console.error("[/api/user-monsters] unknown error:", error);
+        setError(ERROR.INTERNAL_ERROR.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -213,16 +211,22 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(
-          body?.message ?? '개체값 처리에 실패했어요.'
-        );
-        return;
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       await loadMonsters();
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        console.error(`[/api/user-monsters/${userMonsterId}/iv] ApiError (${error.key} / ${error.code}):`, error.message);
+        setError(error.message);
+      } else if (error instanceof Error) {
+        console.error(`[/api/user-monsters/${userMonsterId}/iv] unexpected error:`, error.message);
+        setError(error.message);
+      } else {
+        console.error(`[/api/user-monsters/${userMonsterId}/iv] unknown error:`, error);
+        setError(ERROR.INTERNAL_ERROR.message);
+      }
     } finally {
       setBusy(false);
     }
