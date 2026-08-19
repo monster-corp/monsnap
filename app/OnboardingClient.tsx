@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '700', '900'],
@@ -20,7 +21,6 @@ const notoSans = Noto_Sans_KR({
 });
 
 const SCANS_PATH = '/scans';
-const CODE_OK = 20000;
 const AUTO_SLIDE_MS = 3000;
 
 const SCREEN_FRAME =
@@ -263,26 +263,33 @@ export default function OnboardingClient() {
           .json()
           .catch(() => null);
 
-        if (
-          !res.ok ||
-          body?.code !== CODE_OK
-        ) {
-          setSubmitError(
-            body?.message ??
-              '닉네임 등록에 실패했어요. 다시 시도해주세요.'
-          );
-
-          setSubmitting(false);
-          return;
+        // 서버 응답이 OK가 아닐 경우 처리
+        if (!res.ok || body?.code !== ERROR.OK.code) {
+          const serverMessage = body?.message;
+          if (serverMessage) {
+            setSubmitError(serverMessage);
+            return;
+          }
+          throw new ApiError('INTERNAL_ERROR');
         }
 
         router.push(SCANS_PATH);
         router.refresh();
-      } catch {
-        setSubmitError(
-          '네트워크 오류가 발생했어요. 다시 시도해주세요.'
-        );
-
+      } catch (error) {
+        if (error instanceof ApiError) {
+          console.error(
+            `[/api/users] ApiError (${error.key} / ${error.code}):`,
+            error.message
+          );
+          setSubmitError(error.message);
+        } else if (error instanceof Error) {
+          console.error(`[/api/users] unexpected error:`, error.message);
+          setSubmitError(ERROR.INTERNAL_ERROR.message);
+        } else {
+          console.error(`[/api/users] unknown error:`, error);
+          setSubmitError(ERROR.INTERNAL_ERROR.message);
+        }
+      } finally {
         setSubmitting(false);
       }
     };
