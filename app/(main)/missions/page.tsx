@@ -13,7 +13,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
-import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
@@ -239,15 +238,19 @@ export default function MissionsPage() {
       const res = await fetch('/api/missions');
       const body = await res.json().catch(() => null);
 
-      // ERROR 모듈 대신 문자열 'OK' 직접 비교
-      if (!res.ok || body?.code !== 'OK') {
-        // 세션 만료 등 서버가 전달한 메시지가 있으면 UI에 최우선 노출
+      // 백엔드 성공 코드 형태(200, 'OK', 혹은 body.code 미정의 시 res.ok 기준) 유연 대응
+      const isSuccess =
+        res.ok &&
+        (body?.code === 'OK' || body?.code === 20000 || body?.code === 200 || body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
+        // 'OK', 'SUCCESS' 등 성공형 문구가 에러 메시지로 표시되는 것 방지
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
           setError(serverMessage);
           return;
         }
-        setError('미션을 불러오지 못했습니다.');
+        setError('미션 정보를 불러오지 못했습니다.');
         return;
       }
 

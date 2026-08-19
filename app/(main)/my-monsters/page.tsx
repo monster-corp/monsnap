@@ -136,13 +136,15 @@ export default function MyMonstersPage() {
     ) ?? null;
 
   // 정렬은 서버가 처리한다 (lib/user-monsters.ts)
+
+  // loadMonsters 데이터 추출 유연화
   const loadMonsters = useCallback(async () => {
     const option =
       SORT_OPTIONS.find((item) => item.key === sortKey) ??
       SORT_OPTIONS[0];
 
     setLoading(true);
-    setError(null); // 정렬/재시도 시 에러 화면 초기화
+    setError(null);
 
     try {
       const res = await fetch(
@@ -151,22 +153,23 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== 'OK') {
+      const isSuccess =
+        res.ok &&
+        (body?.code === 'OK' || body?.code === 20000 || body?.code === 200 || body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
-          setError(serverMessage); // 세션 만료 등 서버 커스텀 에러 표시
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
+          setError(serverMessage);
           return;
         }
-        setError('보유 몬스터 목록을 불러오지 못했습니다.');
+        setError('보유한 몬스터 정보를 불러오지 못했습니다.');
         return;
       }
 
-      const list = body.data?.userMonsters;
-
-      if (!Array.isArray(list)) {
-        setError('올바르지 않은 데이터 형식입니다.');
-        return;
-      }
+      // body.data.userMonsters -> body.data -> body.userMonsters 순으로 배열 탐색
+      const rawList = body?.data?.userMonsters ?? body?.data ?? body?.userMonsters;
+      const list = Array.isArray(rawList) ? rawList : [];
 
       setMonsters(list);
     } catch (err) {
@@ -181,10 +184,7 @@ export default function MyMonstersPage() {
     void loadMonsters();
   }, [loadMonsters]);
 
-  /**
-   * 같은 몬스터를 다시 잡으면 새 개체값이 제안된다.
-   * accept면 제안값으로 교체하고, reject면 기존 값을 유지한다.
-   */
+  // handleIvDecision 성공 조건 수정
   const handleIvDecision = async (
     userMonsterId: string,
     decision: 'accept' | 'reject'
@@ -192,7 +192,7 @@ export default function MyMonstersPage() {
     if (busy) return;
 
     setBusy(true);
-    setError(null); // IV 판정 요청 시 기존 에러 초기화
+    setError(null);
 
     try {
       const res = await fetch(
@@ -208,9 +208,13 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== 'OK') {
+      const isSuccess =
+        res.ok &&
+        (body?.code === 'OK' || body?.code === 20000 || body?.code === 200 || body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
           setError(serverMessage);
           return;
         }

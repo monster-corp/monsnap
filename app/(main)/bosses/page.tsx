@@ -396,9 +396,19 @@ export default function BossPage() {
       // ----------------------------------------------------------
       // 유저 몬스터 데이터
       // ----------------------------------------------------------
-      if (!monstersRes.ok || monstersBody?.code !== ERROR.OK.code) {
+
+      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+      const isMonstersSuccess =
+        monstersRes.ok &&
+        (monstersBody?.code === 20000 ||
+          monstersBody?.code === 200 ||
+          monstersBody?.code === 'OK' ||
+          monstersBody?.code === ERROR.OK.code ||
+          monstersBody?.code === undefined);
+
+      if (!isMonstersSuccess) {
         const serverMessage = monstersBody?.message;
-        if (serverMessage) {
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
           setLoadError(serverMessage);
           return;
         }
@@ -497,11 +507,17 @@ export default function BossPage() {
           .json()
           .catch(() => null);
 
-        if (
-          !res.ok ||
-          body?.code !== ERROR.OK.code ||
-          !body?.data
-        ) {
+        // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+        const isSuccess =
+          res.ok &&
+          (body?.code === 20000 ||
+            body?.code === 200 ||
+            body?.code === 'OK' ||
+            body?.code === ERROR.OK.code ||
+            body?.code === undefined);
+
+        // 성공 코드가 아니거나 data 객체가 없으면 예외 발생
+        if (!isSuccess || !body?.data) {
           throw new InvalidBattleResultError();
         }
 

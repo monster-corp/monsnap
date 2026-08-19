@@ -96,10 +96,19 @@ export default function HomePage() {
           const userRes = await fetch('/api/users');
           const userData = await userRes.json().catch(() => null);
 
-          if (!userRes.ok || userData?.code !== ERROR.OK.code) {
+          // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+          const isUserSuccess =
+            userRes.ok &&
+            (userData?.code === 20000 ||
+              userData?.code === 200 ||
+              userData?.code === 'OK' ||
+              userData?.code === ERROR.OK.code ||
+              userData?.code === undefined);
+
+          if (!isUserSuccess) {
             // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
             const serverMessage = userData?.message;
-            if (serverMessage) {
+            if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
               setError(serverMessage);
               return;
             }
@@ -127,10 +136,19 @@ export default function HomePage() {
           const monsterRes = await fetch('/api/user-monsters?sort=dexId&order=asc');
           const monsterData = await monsterRes.json().catch(() => null);
 
-          if (!monsterRes.ok || monsterData?.code !== ERROR.OK.code) {
+          // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+          const isMonsterSuccess =
+            monsterRes.ok &&
+            (monsterData?.code === 20000 ||
+              monsterData?.code === 200 ||
+              monsterData?.code === 'OK' ||
+              monsterData?.code === ERROR.OK.code ||
+              monsterData?.code === undefined);
+
+          if (!isMonsterSuccess) {
             // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
             const serverMessage = monsterData?.message;
-            if (serverMessage) {
+            if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
               setError(serverMessage);
               return;
             }

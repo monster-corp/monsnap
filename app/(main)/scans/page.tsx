@@ -184,8 +184,15 @@ export default function ScansPage() {
       const res = await fetch('/api/eggs');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== ERROR.OK.code) {
-        // 서버에서 전달된 메시지가 있으면 사용하고, 없으면 기본 에러 메시지 노출
+      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, body.code 미정의) 유연 검증
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code);
+
+      if (!isSuccess) {
         setEggError(body?.message ?? ERROR.INTERNAL_ERROR.message);
         return;
       }
@@ -205,7 +212,7 @@ export default function ScansPage() {
         cutoutImageUrl: item.cutoutImageUrl,
       }));
 
-      // 서버에 없는 만료 세션의 로컬 키를 정리한다
+      // 서버에 없는 만료 세션의 로컬 키 정리
       const activeSessionIds = new Set(
         parsedEggs
           .map((egg) => egg.activeWalkSessionId)
@@ -245,6 +252,10 @@ export default function ScansPage() {
     }
   }, []);
 
+  useEffect(() => {
+    void loadEggs();
+  }, [loadEggs]);
+
   // 누적값 동기화라 일시 실패 후 다음 주기에 재전송할 수 있다
   const syncSteps = useCallback(async (): Promise<boolean> => {
     if (!walkingEgg?.activeWalkSessionId) return true;
@@ -268,7 +279,7 @@ export default function ScansPage() {
       );
       const body = await res.json().catch(() => null);
 
-      // 만료/종료된 세션이면 로컬 키를 지우고 기존 행동 유도 문구를 노출한다
+      // 만료/종료된 세션이면 로컬 키를 지우고 기존 행동 유도 문구 노출
       if (
         body?.code === ERROR.WALK_SESSION_NOT_FOUND.code ||
         body?.code === ERROR.SESSION_NOT_ACTIVE.code
@@ -279,7 +290,16 @@ export default function ScansPage() {
         return false;
       }
 
-      if (!res.ok || body?.code !== ERROR.OK.code) {
+      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code ||
+          body?.code === undefined);
+
+      if (!isSuccess) {
         setEggError(body?.message ?? ERROR.INTERNAL_ERROR.message);
         return false;
       }
@@ -442,10 +462,18 @@ export default function ScansPage() {
         throw new ApiError("EGG_SLOT_FULL");
       }
 
-      // 서버 응답이 OK가 아닐 경우 서버 메시지 우선 활용
-      if (!res.ok || body?.code !== ERROR.OK.code) {
+      // 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 유연 검증
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code ||
+          body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
           setScanError(serverMessage);
           setCaptureStep('idle');
           return;
@@ -514,14 +542,23 @@ export default function ScansPage() {
       });
       const body = await res.json().catch(() => null);
 
-      // 서버 응답이 OK가 아닐 경우 처리
-      if (!res.ok || body?.code !== ERROR.OK.code) {
+      // 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 유연 검증
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code ||
+          body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
-          setEggError(serverMessage);
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
+          setScanError(serverMessage);
+          setCaptureStep('idle');
           return;
         }
-        throw new ApiError('INTERNAL_ERROR');
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       localStepsRef.current = 0;
@@ -581,14 +618,23 @@ export default function ScansPage() {
       );
       const body = await res.json().catch(() => null);
 
-      // 서버 응답이 OK가 아닐 경우 처리
-      if (!res.ok || body?.code !== ERROR.OK.code) {
+      // 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 유연 검증
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code ||
+          body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
-          setEggError(serverMessage);
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
+          setScanError(serverMessage);
+          setCaptureStep('idle');
           return;
         }
-        throw new ApiError('INTERNAL_ERROR');
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
@@ -642,8 +688,16 @@ export default function ScansPage() {
         );
       }
 
-      // 서버 응답이 OK가 아닐 경우 처리
-      if (!res.ok || body?.code !== ERROR.OK.code) {
+      // 1. 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code ||
+          body?.code === undefined);
+
+      if (!isSuccess) {
         if (res.status === 404) {
           if (sessionId) {
             localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);

@@ -255,10 +255,18 @@ export default function OnboardingClient() {
 
       const body = await res.json().catch(() => null);
 
-      // 서버 응답이 OK가 아닐 경우 처리
-      if (!res.ok || body?.code !== ERROR.OK.code) {
+      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
+      const isSuccess =
+        res.ok &&
+        (body?.code === 20000 ||
+          body?.code === 200 ||
+          body?.code === 'OK' ||
+          body?.code === ERROR.OK.code ||
+          body?.code === undefined);
+
+      if (!isSuccess) {
         const serverMessage = body?.message;
-        if (serverMessage) {
+        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
           setSubmitError(serverMessage);
           setSubmitting(false); // 실패 시 제출 버튼 재활성화
           return;
