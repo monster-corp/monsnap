@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { Menu, Swords, Trophy, X } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
 import { BossNotFoundError, InvalidBattleResultError } from "@/lib/errors/bosses";
-import { ApiError, ERROR, respondWithStatus } from "@/lib/api/response";
+import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],

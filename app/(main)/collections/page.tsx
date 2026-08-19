@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ApiError, ERROR } from "@/lib/api/response";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 interface BaseStats {
   hp: number;
@@ -86,26 +85,31 @@ export default function CollectionsPage() {
       const res = await fetch('/api/monsters');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(body?.message ?? '도감을 불러오지 못했어요.');
-        return;
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        throw new ApiError("INTERNAL_ERROR");
       }
 
       const list = body.data?.monsters;
 
       if (!Array.isArray(list)) {
-        console.error('[도감] 예상하지 못한 응답 구조:', body);
-        setError('도감을 불러오지 못했어요.');
-        return;
+        throw new ApiError("INVALID_REQUEST");
       }
 
       // 정렬은 서버가 처리한다 (lib/monsters.ts: EPIC → RARE → COMMON, 등급 내 dexId 순)
       setMonsters(list);
       setTotalCount(body.data?.totalCount ?? 0);
       setCaughtCount(body.data?.caughtCount ?? 0);
-      setError(null);
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        console.error(`[/api/monsters] ApiError (${error.key} / ${error.code}):`, error.message);
+        setError(error.message);
+      } else if (error instanceof Error) {
+        console.error("[/api/monsters] unexpected error:", error.message);
+        setError(error.message);
+      } else {
+        console.error("[/api/monsters] unknown error:", error);
+        setError(ERROR.INTERNAL_ERROR.message);
+      }
     } finally {
       setLoading(false);
     }
