@@ -10,8 +10,7 @@ import React, {
 import Link from 'next/link';
 import { Menu, Swords, Trophy, X } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
-import { BossNotFoundError, InvalidBattleResultError } from "@/lib/errors/bosses";
-import { ApiError, ERROR } from "@/lib/api/response";
+import { ERROR } from "@/lib/api/error-codes";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
@@ -356,86 +355,39 @@ export default function BossPage() {
       const bossBody = await bossRes.json().catch(() => null);
       const monstersBody = await monstersRes.json().catch(() => null);
 
-      // ----------------------------------------------------------
-      // 보스 데이터
-      // ----------------------------------------------------------
-      if (
-        bossRes.ok &&
-        bossBody?.code === ERROR.OK.code &&
-        bossBody?.data
-      ) {
-        const data = bossBody.data as BossApiData;
-
-        const loadedBoss: BossState = {
-          ...data,
-          dexId: data.dexId ?? Number(BOSS_ID),
-          maxHp: data.hp,
-          currentHp: data.hp,
-          bgImageUrl: data.bgImageUrl || null,
-        };
-
-        setBoss(loadedBoss);
-        setRemainingMs(data.timeLimitMs);
-      } else {
-        // 1) 서버에서 전달된 메시지가 있다면 최우선으로 UI 노출
-        const serverMessage = bossBody?.message;
-        if (serverMessage) {
-          setLoadError(serverMessage);
-          return;
-        }
-
-        // 2) 404 응답일 경우에만 BossNotFoundError 투척
-        if (bossRes.status === 404) {
-          throw new BossNotFoundError();
-        }
-
-        // 3) 그 외 알 수 없는 서버 에러일 경우 INTERNAL_ERROR 예외 투척
-        throw new ApiError("INTERNAL_ERROR");
+      if (!bossRes.ok || bossBody?.code !== ERROR.OK.code) {
+        setLoadError(bossBody?.message ?? ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
-      // ----------------------------------------------------------
-      // 유저 몬스터 데이터
-      // ----------------------------------------------------------
+      const data = bossBody.data as BossApiData;
+      const loadedBoss: BossState = {
+        ...data,
+        dexId: data.dexId ?? Number(BOSS_ID),
+        maxHp: data.hp,
+        currentHp: data.hp,
+        bgImageUrl: data.bgImageUrl || null,
+      };
+      setBoss(loadedBoss);
+      setRemainingMs(data.timeLimitMs);
 
-      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-      const isMonstersSuccess =
-        monstersRes.ok &&
-        (monstersBody?.code === 20000 ||
-          monstersBody?.code === 200 ||
-          monstersBody?.code === 'OK' ||
-          monstersBody?.code === ERROR.OK.code ||
-          monstersBody?.code === undefined);
-
-      if (!isMonstersSuccess) {
-        const serverMessage = monstersBody?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setLoadError(serverMessage);
-          return;
-        }
-        throw new ApiError("INTERNAL_ERROR");
+      if (!monstersRes.ok || monstersBody?.code !== ERROR.OK.code) {
+        setLoadError(monstersBody?.message ?? ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
       const list = monstersBody.data?.userMonsters;
 
       if (!Array.isArray(list)) {
-        throw new ApiError("INVALID_REQUEST");
+        console.error('[보스전] 예상하지 못한 몬스터 응답 구조:', monstersBody);
+        setLoadError(ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
       setMyMonsters(list);
     } catch (error) {
-      if (error instanceof BossNotFoundError) {
-        console.error(`[/api/bosses] BossNotFoundError:`, error.message);
-        setLoadError(error.message);
-      } else if (error instanceof ApiError) {
-        console.error(`[/api/bosses] ApiError (${error.key} / ${error.code}):`, error.message);
-        setLoadError(error.message);
-      } else if (error instanceof Error) {
-        console.error("[/api/bosses] unexpected error:", error.message);
-        setLoadError(error.message);
-      } else {
-        console.error("[/api/bosses] unknown error:", error);
-        setLoadError(ERROR.INTERNAL_ERROR.message);
-      }
+      console.error('[보스전] 데이터 로딩 실패:', error);
+      setLoadError(ERROR.INTERNAL_ERROR.message);
     } finally {
       setIsLoading(false);
     }
@@ -472,79 +424,44 @@ export default function BossPage() {
 
   const submitBattleResult = useCallback(
     async (payload: BattleSubmitPayload) => {
-      if (!boss || submittingRef.current) {
-        return;
-      }
+      if (!boss || submittingRef.current) return;
 
       submittingRef.current = true;
-
       battleEndedRef.current = true;
-
       setIsBattleEnded(true);
-
       setResultState('submitting');
-
       setResultError(null);
-
       lastSubmitPayloadRef.current = payload;
 
       try {
-        const res = await fetch(
-          `/api/bosses/${boss.dexId}`,
-          {
-            method: 'POST',
+        const res = await fetch(`/api/bosses/${boss.dexId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => null);
 
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-
-            body: JSON.stringify(payload),
-          }
-        );
-
-        const body = await res
-          .json()
-          .catch(() => null);
-
-        // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-        const isSuccess =
-          res.ok &&
-          (body?.code === 20000 ||
-            body?.code === 200 ||
-            body?.code === 'OK' ||
-            body?.code === ERROR.OK.code ||
-            body?.code === undefined);
-
-        // 성공 코드가 아니거나 data 객체가 없으면 예외 발생
-        if (!isSuccess || !body?.data) {
-          throw new InvalidBattleResultError();
+        if (!res.ok || body?.code !== ERROR.OK.code || !body?.data) {
+          setResultError(body?.message ?? ERROR.INTERNAL_ERROR.message);
+          setResultState('error');
+          setShowNavigation(true);
+          return;
         }
 
         const result = body.data as BattleResult;
-
         setBattleResult(result);
         setResultState(result.isCleared ? 'victory' : 'failure');
         setShowNavigation(true);
       } catch (error) {
-        if (error instanceof ApiError) {
-          console.error(`[/api/bosses] ApiError (${error.key} / ${error.code}):`, error.message);
-          setResultError(error.message);
-        } else if (error instanceof Error) {
-          console.error("[/api/bosses] unexpected error:", error.message);
-          setResultError(error.message);
-        } else {
-          console.error("[/api/bosses] unknown error:", error);
-          setResultError(ERROR.INTERNAL_ERROR.message);
-        }
-
+        console.error('[보스전] 결과 전송 실패:', error);
+        setResultError(ERROR.INTERNAL_ERROR.message);
         setResultState('error');
         setShowNavigation(true);
       } finally {
         submittingRef.current = false;
       }
     },
-    [ boss, getDamageMultiplier, selectedMonster ]
+    [boss]
   );
 
   // ==============================================================

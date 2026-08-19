@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
-import { ApiError, ERROR } from "@/lib/api/response";
+import { ERROR } from "@/lib/api/error-codes";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '700', '900'],
@@ -255,43 +255,18 @@ export default function OnboardingClient() {
 
       const body = await res.json().catch(() => null);
 
-      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code ||
-          body?.code === undefined);
-
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setSubmitError(serverMessage);
-          setSubmitting(false); // 실패 시 제출 버튼 재활성화
-          return;
-        }
-        throw new ApiError('INTERNAL_ERROR');
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setSubmitError(body?.message ?? ERROR.INTERNAL_ERROR.message);
+        setSubmitting(false);
+        return;
       }
 
-      // 성공 시에는 setSubmitting(false)를 실행하지 않고 페이지 전환
       router.push(SCANS_PATH);
       router.refresh();
     } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(
-          `[/api/users] ApiError (${error.key} / ${error.code}):`,
-          error.message
-        );
-        setSubmitError(error.message);
-      } else if (error instanceof Error) {
-        console.error(`[/api/users] unexpected error:`, error.message);
-        setSubmitError(ERROR.INTERNAL_ERROR.message);
-      } else {
-        console.error(`[/api/users] unknown error:`, error);
-        setSubmitError(ERROR.INTERNAL_ERROR.message);
-      }
-      setSubmitting(false); // 에러 발생 시 제출 버튼 재활성화
+      console.error('[/api/users] 요청 실패:', error);
+      setSubmitError(ERROR.INTERNAL_ERROR.message);
+      setSubmitting(false);
     }
   };
 

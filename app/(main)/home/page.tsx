@@ -14,7 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { ApiError, ERROR } from "@/lib/api/response";
+import { ERROR } from "@/lib/api/error-codes";
 
 const SWIPE_THRESHOLD = 45;
 
@@ -96,37 +96,19 @@ export default function HomePage() {
           const userRes = await fetch('/api/users');
           const userData = await userRes.json().catch(() => null);
 
-          // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-          const isUserSuccess =
-            userRes.ok &&
-            (userData?.code === 20000 ||
-              userData?.code === 200 ||
-              userData?.code === 'OK' ||
-              userData?.code === ERROR.OK.code ||
-              userData?.code === undefined);
-
-          if (!isUserSuccess) {
-            // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
-            const serverMessage = userData?.message;
-            if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-              setError(serverMessage);
+          if (!userRes.ok || userData?.code !== ERROR.OK.code) {
+            if (userData?.message) {
+              setError(userData.message);
               return;
             }
-            // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-            throw new ApiError("INTERNAL_ERROR");
-          }
-
-          setNickname(userData.data?.nickname ?? '새내기 탐험가');
-          setScanCharges(userData.data?.scanCharge?.charges ?? 0);
-          setMaxScanCharges(userData.data?.scanCharge?.maxCharges ?? 5);
-        } catch (error) {
-          if (error instanceof ApiError) {
-            console.error(`[/api/users] ApiError (${error.key} / ${error.code}):`, error.message);
-          } else if (error instanceof Error) {
-            console.error("[/api/users] unexpected error:", error.message);
+            console.error('[/api/users] 요청 실패:', userData);
           } else {
-            console.error("[/api/users] unknown error:", error);
+            setNickname(userData.data?.nickname ?? '새내기 탐험가');
+            setScanCharges(userData.data?.scanCharge?.charges ?? 0);
+            setMaxScanCharges(userData.data?.scanCharge?.maxCharges ?? 5);
           }
+        } catch (error) {
+          console.error('[/api/users] 요청 실패:', error);
         }
 
         // ─────────────────────
@@ -136,30 +118,25 @@ export default function HomePage() {
           const monsterRes = await fetch('/api/user-monsters?sort=dexId&order=asc');
           const monsterData = await monsterRes.json().catch(() => null);
 
-          // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-          const isMonsterSuccess =
-            monsterRes.ok &&
-            (monsterData?.code === 20000 ||
-              monsterData?.code === 200 ||
-              monsterData?.code === 'OK' ||
-              monsterData?.code === ERROR.OK.code ||
-              monsterData?.code === undefined);
-
-          if (!isMonsterSuccess) {
-            // 서버에서 내려준 메시지가 있다면 해당 메시지를 UI에 노출
-            const serverMessage = monsterData?.message;
-            if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-              setError(serverMessage);
+          if (!monsterRes.ok || monsterData?.code !== ERROR.OK.code) {
+            if (monsterData?.message) {
+              setError(monsterData.message);
               return;
             }
-            // 메시지가 없는 알 수 없는 서버 에러일 때만 INTERNAL_ERROR 예외 던지기
-            throw new ApiError("INTERNAL_ERROR");
+            setMonsterLoadError(true);
+            setMonsters([]);
+            setSpeechText('몬스터 정보를 불러오지 못했어요.');
+            return;
           }
 
           const list = monsterData.data?.userMonsters;
 
           if (!Array.isArray(list)) {
-            throw new ApiError("INVALID_REQUEST");
+            console.error('[/api/user-monsters] 예상하지 못한 응답 구조:', monsterData);
+            setMonsterLoadError(true);
+            setMonsters([]);
+            setSpeechText('몬스터 정보를 불러오지 못했어요.');
+            return;
           }
 
           if (list.length === 0) {
@@ -192,14 +169,7 @@ export default function HomePage() {
             setSpeechText('오늘도 같이 탐험해볼까요?');
           }
         } catch (error) {
-          if (error instanceof ApiError) {
-            console.error(`[/api/user-monsters] ApiError (${error.key} / ${error.code}):`, error.message);
-          } else if (error instanceof Error) {
-            console.error("[/api/user-monsters] unexpected error:", error.message);
-          } else {
-            console.error("[/api/user-monsters] unknown error:", error);
-          }
-
+          console.error('[/api/user-monsters] 요청 실패:', error);
           setMonsterLoadError(true);
           setMonsters([]);
           setSpeechText('몬스터 정보를 불러오지 못했어요.');

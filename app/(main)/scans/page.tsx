@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, Camera, Footprints } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
-import { ApiError, ERROR } from "@/lib/api/response";
+import { ERROR } from "@/lib/api/error-codes";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '700', '900'],
@@ -184,15 +184,7 @@ export default function ScansPage() {
       const res = await fetch('/api/eggs');
       const body = await res.json().catch(() => null);
 
-      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, body.code 미정의) 유연 검증
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code);
-
-      if (!isSuccess) {
+      if (!res.ok || body?.code !== ERROR.OK.code) {
         setEggError(body?.message ?? ERROR.INTERNAL_ERROR.message);
         return;
       }
@@ -200,7 +192,9 @@ export default function ScansPage() {
       const list = body.data?.eggs;
 
       if (!Array.isArray(list)) {
-        throw new ApiError("INVALID_REQUEST");
+        console.error('[인화 대기] 예상하지 못한 응답 구조:', body);
+        setEggError('인화 대기 목록을 불러오지 못했어요.');
+        return;
       }
 
       const parsedEggs: Egg[] = list.map((item) => ({
@@ -237,16 +231,8 @@ export default function ScansPage() {
           : (parsedEggs[0]?.eggId ?? null)
       );
     } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(`[/api/eggs] ApiError (${error.key} / ${error.code}):`, error.message);
-        setEggError(error.message);
-      } else if (error instanceof Error) {
-        console.error("[/api/eggs] unexpected error:", error.message);
-        setEggError(error.message);
-      } else {
-        console.error("[/api/eggs] unknown error:", error);
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      }
+      console.error('[인화 대기] 목록 조회 실패:', error);
+      setEggError(ERROR.INTERNAL_ERROR.message);
     } finally {
       setEggsLoading(false);
     }
@@ -255,6 +241,23 @@ export default function ScansPage() {
   useEffect(() => {
     void loadEggs();
   }, [loadEggs]);
+
+  // 활성 세션의 미전송 걸음 수를 복원한다
+  useEffect(() => {
+    if (!activeSessionId) {
+      localStepsRef.current = 0;
+      lastSentRef.current = 0;
+      setSessionSteps(0);
+      return;
+    }
+
+    const saved = Number(
+      localStorage.getItem(STEPS_STORAGE_PREFIX + activeSessionId) ?? 0
+    );
+    localStepsRef.current = Number.isFinite(saved) ? saved : 0;
+    lastSentRef.current = 0;
+    setSessionSteps(localStepsRef.current);
+  }, [activeSessionId]);
 
   // 누적값 동기화라 일시 실패 후 다음 주기에 재전송할 수 있다
   const syncSteps = useCallback(async (): Promise<boolean> => {
@@ -265,8 +268,6 @@ export default function ScansPage() {
 
     // 서버는 감소한 누적값을 거부하므로 증가했을 때만 전송한다
     if (steps <= lastSentRef.current) return true;
-
-    setEggError(null);
 
     try {
       const res = await fetch(
@@ -290,16 +291,7 @@ export default function ScansPage() {
         return false;
       }
 
-      // 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code ||
-          body?.code === undefined);
-
-      if (!isSuccess) {
+      if (!res.ok || body?.code !== ERROR.OK.code) {
         setEggError(body?.message ?? ERROR.INTERNAL_ERROR.message);
         return false;
       }
@@ -307,7 +299,9 @@ export default function ScansPage() {
       const egg = body.data?.egg;
 
       if (!egg) {
-        throw new ApiError("INVALID_REQUEST");
+        console.error('[걷기 동기화] 예상하지 못한 응답 구조:', body);
+        setEggError('걸음 동기화에 실패했어요. 잠시 후 다시 시도해주세요.');
+        return false;
       }
 
       lastSentRef.current = steps;
@@ -323,16 +317,8 @@ export default function ScansPage() {
       setEggError(null);
       return true;
     } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(`[/api/walk-sessions] ApiError (${error.key} / ${error.code}):`, error.message);
-        setEggError(error.message);
-      } else if (error instanceof Error) {
-        console.error("[/api/walk-sessions] unexpected error:", error.message);
-        setEggError(error.message);
-      } else {
-        console.error("[/api/walk-sessions] unknown error:", error);
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      }
+      console.error('[걷기 동기화] 요청 실패:', error);
+      setEggError(ERROR.INTERNAL_ERROR.message);
       return false;
     }
   }, [walkingEgg, loadEggs]);
@@ -418,7 +404,8 @@ export default function ScansPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isWalking, syncSteps]);
 
-  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCapture = async (e:
+                               React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -438,6 +425,12 @@ export default function ScansPage() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    const fail = (message: string, slotFull = false) => {
+      setIsSlotFull(slotFull);
+      setScanError(message);
+      setCaptureStep('idle');
+    };
+
     try {
       const uploadFile = await resizeImage(file);
       const formData = new FormData();
@@ -451,6 +444,7 @@ export default function ScansPage() {
 
       const body = await res.json().catch(() => null);
 
+      // 서버 응답이 빨라도 최소 인화 연출 시간은 보장한다
       const elapsed = Date.now() - startedAt;
       if (elapsed < MIN_DEVELOP_MS) {
         await new Promise((resolve) =>
@@ -459,56 +453,33 @@ export default function ScansPage() {
       }
 
       if (body?.code === ERROR.EGG_SLOT_FULL.code) {
-        throw new ApiError("EGG_SLOT_FULL");
+        fail(body?.message ?? ERROR.EGG_SLOT_FULL.message, true);
+        return;
       }
 
-      // 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 유연 검증
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code ||
-          body?.code === undefined);
-
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setScanError(serverMessage);
-          setCaptureStep('idle');
-          return;
-        }
-        throw new ApiError("INTERNAL_ERROR");
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        fail(body?.message ?? '스캔에 실패했어요. 다시 시도해주세요.');
+        return;
       }
 
       const requiredSteps = body.data?.requiredSteps;
 
       if (typeof requiredSteps !== 'number') {
-        throw new ApiError("INVALID_REQUEST");
+        console.error('[촬영] 예상하지 못한 스캔 응답 구조:', body);
+        fail('스캔 결과를 확인하지 못했어요. 다시 시도해주세요.');
+        return;
       }
 
       setNewEggSteps(requiredSteps);
       setIsScanDone(true);
       await loadEggs();
     } catch (error) {
-      setCaptureStep('idle');
-
       if (error instanceof DOMException && error.name === 'AbortError') {
-        console.error(
-          `[/api/scans] ApiError (${ERROR.VLM_TIMEOUT.code}):`,
-          ERROR.VLM_TIMEOUT.message
-        );
-        setScanError(ERROR.VLM_TIMEOUT.message);
-      } else if (error instanceof ApiError) {
-        console.error(`[/api/scans] ApiError (${error.key} / ${error.code}):`, error.message);
-        setIsSlotFull(error.key === "EGG_SLOT_FULL");
-        setScanError(error.message);
-      } else if (error instanceof Error) {
-        console.error('[/api/scans] unexpected error:', error.message);
-        setScanError(ERROR.INTERNAL_ERROR.message);
+        console.error('[촬영] 스캔 요청 타임아웃');
+        fail(ERROR.VLM_TIMEOUT.message);
       } else {
-        console.error('[/api/scans] unknown error:', error);
-        setScanError(ERROR.INTERNAL_ERROR.message);
+        console.error('[촬영] 스캔 실패:', error);
+        fail(ERROR.INTERNAL_ERROR.message);
       }
     } finally {
       clearTimeout(timeoutId);
@@ -542,23 +513,9 @@ export default function ScansPage() {
       });
       const body = await res.json().catch(() => null);
 
-      // 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 유연 검증
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code ||
-          body?.code === undefined);
-
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setScanError(serverMessage);
-          setCaptureStep('idle');
-          return;
-        }
-        throw new ApiError("INTERNAL_ERROR");
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setEggError(body?.message ?? '걷기를 시작하지 못했어요. 잠시 후 다시 시도해주세요.');
+        return;
       }
 
       localStepsRef.current = 0;
@@ -572,25 +529,8 @@ export default function ScansPage() {
         setEggError('센서를 사용할 수 없어 수동 걸음 버튼으로 진행할 수 있어요.');
       }
     } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/walk-sessions] ApiError (${error.key} / ${error.code}):`,
-          error.message
-        );
-        setEggError(error.message);
-      } else if (error instanceof Error) {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/walk-sessions] unexpected error:`,
-          error.message
-        );
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      } else {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/walk-sessions] unknown error:`,
-          error
-        );
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      }
+      console.error('[걷기 시작] 요청 실패:', error);
+      setEggError(ERROR.INTERNAL_ERROR.message);
     } finally {
       setBusy(false);
     }
@@ -618,47 +558,16 @@ export default function ScansPage() {
       );
       const body = await res.json().catch(() => null);
 
-      // 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 유연 검증
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code ||
-          body?.code === undefined);
-
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setScanError(serverMessage);
-          setCaptureStep('idle');
-          return;
-        }
-        throw new ApiError("INTERNAL_ERROR");
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setEggError(body?.message ?? '걷기를 종료하지 못했어요. 잠시 후 다시 시도해주세요.');
+        return;
       }
 
       localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
       await loadEggs();
     } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(
-          `[/api/eggs/${walkingEgg.eggId}/walk-sessions/${sessionId}/end] ApiError (${error.key} / ${error.code}):`,
-          error.message
-        );
-        setEggError(error.message);
-      } else if (error instanceof Error) {
-        console.error(
-          `[/api/eggs/${walkingEgg.eggId}/walk-sessions/${sessionId}/end] unexpected error:`,
-          error.message
-        );
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      } else {
-        console.error(
-          `[/api/eggs/${walkingEgg.eggId}/walk-sessions/${sessionId}/end] unknown error:`,
-          error
-        );
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      }
+      console.error('[걷기 종료] 요청 실패:', error);
+      setEggError(ERROR.INTERNAL_ERROR.message);
     } finally {
       setBusy(false);
     }
@@ -688,39 +597,22 @@ export default function ScansPage() {
         );
       }
 
-      // 1. 백엔드 성공 코드(20000, 200, 'OK', ERROR.OK.code, undefined) 대응
-      const isSuccess =
-        res.ok &&
-        (body?.code === 20000 ||
-          body?.code === 200 ||
-          body?.code === 'OK' ||
-          body?.code === ERROR.OK.code ||
-          body?.code === undefined);
-
-      if (!isSuccess) {
+      if (!res.ok || body?.code !== ERROR.OK.code) {
         if (res.status === 404) {
           if (sessionId) {
             localStorage.removeItem(STEPS_STORAGE_PREFIX + sessionId);
           }
           await loadEggs();
         }
-
-        const serverMessage = body?.message;
-        if (serverMessage) {
-          setEggError(serverMessage);
-          return;
-        }
-        throw new ApiError('INTERNAL_ERROR');
+        setEggError(body?.message ?? '몬스터 인화에 실패했어요. 다시 시도해주세요.');
+        return;
       }
 
       const monsterData = body.data?.monster;
       const newMonster = body.data?.isNewMonster;
 
       if (!monsterData || typeof newMonster !== 'boolean') {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/hatch] unexpected response structure:`,
-          body
-        );
+        console.error('[인화] 예상하지 못한 응답 구조:', body);
         setEggError('몬스터 정보를 확인하지 못했어요. 다시 시도해주세요.');
         return;
       }
@@ -740,25 +632,8 @@ export default function ScansPage() {
 
       await loadEggs();
     } catch (error) {
-      if (error instanceof ApiError) {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/hatch] ApiError (${error.key} / ${error.code}):`,
-          error.message
-        );
-        setEggError(error.message);
-      } else if (error instanceof Error) {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/hatch] unexpected error:`,
-          error.message
-        );
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      } else {
-        console.error(
-          `[/api/eggs/${currentEgg.eggId}/hatch] unknown error:`,
-          error
-        );
-        setEggError(ERROR.INTERNAL_ERROR.message);
-      }
+      console.error('[인화] 요청 실패:', error);
+      setEggError(ERROR.INTERNAL_ERROR.message);
     } finally {
       setIsRevealing(false);
       setBusy(false);
