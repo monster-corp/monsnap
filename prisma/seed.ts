@@ -78,9 +78,9 @@ async function main() {
 
   // 2. 걸음 수 요구사항 생성
   const rarityStepRequirements = [
-    { rarity: 'COMMON', requiredSteps: 10 },
-    { rarity: 'RARE', requiredSteps: 30 },
-    { rarity: 'EPIC', requiredSteps: 50 },
+    { rarity: 'COMMON', requiredSteps: 100 },
+    { rarity: 'RARE', requiredSteps: 150 },
+    { rarity: 'EPIC', requiredSteps: 200 },
   ];
 
   for (const req of rarityStepRequirements) {
@@ -157,7 +157,7 @@ async function main() {
       imageUrl: `${STORAGE_BASE_URL}/파리지옥.png`,
       cutoutImageUrl: `${STORAGE_BASE_URL}/파리지옥(누끼).png`,
       bgImageUrl: `${STORAGE_BASE_URL}/배경(파리지옥).png`,
-      hp: 2000,
+      hp: 5000,
       weakAttribute: 'FIRE',
       strongAttribute: 'WATER',
       isActive: true,
@@ -179,7 +179,7 @@ async function main() {
     {
       code: 'DAILY_WALK_SESSION',
       title: '걷기 2번 시작하기',
-      description: '알을 부화시키기 위한 걷기 세션을 시작하세요',
+      description: '사진을 인화시키기 위한 걷기 세션을 시작하세요',
       cycle: 'DAILY',
       conditionType: 'WALK_SESSION_COUNT',
       targetCount: 2,
@@ -197,7 +197,7 @@ async function main() {
     {
       code: 'DAILY_MORNING_HATCH',
       title: '모닝 리프레시',
-      description: '오전 05:00~09:00 사이에 \n걸음을 채우고 알을 부화시키세요',
+      description: '오전 05:00~09:00 사이에 \n걸음을 채우고 사진을 인화시키세요',
       cycle: 'DAILY',
       conditionType: 'HATCH_IN_TIME_RANGE',
       targetCount: 1,
@@ -207,7 +207,7 @@ async function main() {
     {
       code: 'DAILY_NIGHT_HATCH',
       title: '나이트 케어',
-      description: '저녁 20:00~24:00 사이에 \n걸음을 채우고 알을 부화시키세요',
+      description: '저녁 20:00~24:00 사이에 \n걸음을 채우고 사진을 인화시키세요',
       cycle: 'DAILY',
       conditionType: 'HATCH_IN_TIME_RANGE',
       targetCount: 1,
