@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from '@/lib/api/error-codes';
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
@@ -85,37 +86,22 @@ export default function CollectionsPage() {
       const res = await fetch('/api/monsters');
       const body = await res.json().catch(() => null);
 
-      // 백엔드 성공 코드 형태(200, 'OK', 혹은 body.code 미정의 시 res.ok 기준) 유연 대응
-      const isSuccess =
-        res.ok &&
-        (body?.code === 'OK' || body?.code === 20000 || body?.code === 200 || body?.code === undefined);
-
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        // 'OK', 'SUCCESS' 등 성공형 문구가 에러 메시지로 표시되는 것 방지
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setError(serverMessage);
-          return;
-        }
-        setError('몬스터 도감 정보를 불러오지 못했습니다.');
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '몬스터 도감 정보를 불러오지 못했습니다.');
         return;
       }
 
-      // body.data.monsters -> body.monsters -> body.data 순으로 배열 유연 탐색
-      const rawList = body?.data?.monsters ?? body?.monsters ?? body?.data;
-      const list = Array.isArray(rawList) ? rawList : [];
+      const rawList = body?.data?.monsters;
 
       if (!Array.isArray(rawList)) {
+        console.error('[도감] 예상하지 못한 응답 구조:', body);
         setError('올바르지 않은 데이터 형식입니다.');
         return;
       }
 
-      // 정렬은 서버가 처리한다 (lib/monsters.ts: EPIC → RARE → COMMON, 등급 내 dexId 순)
-      setMonsters(list);
-      
-      // 카운트 데이터 유연 추출
-      setTotalCount(body?.data?.totalCount ?? body?.totalCount ?? 0);
-      setCaughtCount(body?.data?.caughtCount ?? body?.caughtCount ?? 0);
+      setMonsters(rawList);
+      setTotalCount(body.data.totalCount ?? 0);
+      setCaughtCount(body.data.caughtCount ?? 0);
     } catch (err) {
       console.error('[/api/monsters] unexpected error:', err);
       // "Failed to fetch" 원문 노출 방지를 위한 한국어 마스킹

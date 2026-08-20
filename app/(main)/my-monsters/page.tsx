@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from '@/lib/api/error-codes';
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
@@ -153,25 +154,20 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      const isSuccess =
-        res.ok &&
-        (body?.code === 'OK' || body?.code === 20000 || body?.code === 200 || body?.code === undefined);
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '보유한 몬스터 정보를 불러오지 못했습니다.');
+        return;
+      }
 
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setError(serverMessage);
-          return;
-        }
+      const rawList = body?.data?.userMonsters;
+
+      if (!Array.isArray(rawList)) {
+        console.error('[내 몬스터] 예상하지 못한 응답 구조:', body);
         setError('보유한 몬스터 정보를 불러오지 못했습니다.');
         return;
       }
 
-      // body.data.userMonsters -> body.data -> body.userMonsters 순으로 배열 탐색
-      const rawList = body?.data?.userMonsters ?? body?.data ?? body?.userMonsters;
-      const list = Array.isArray(rawList) ? rawList : [];
-
-      setMonsters(list);
+      setMonsters(rawList);
     } catch (err) {
       console.error('[/api/user-monsters] unexpected error:', err);
       setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
@@ -208,17 +204,8 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      const isSuccess =
-        res.ok &&
-        (body?.code === 'OK' || body?.code === 20000 || body?.code === 200 || body?.code === undefined);
-
-      if (!isSuccess) {
-        const serverMessage = body?.message;
-        if (serverMessage && serverMessage !== 'OK' && serverMessage !== 'SUCCESS') {
-          setError(serverMessage);
-          return;
-        }
-        setError('개체값 판정 처리에 실패했습니다.');
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '개체값 판정 처리에 실패했습니다.');
         return;
       }
 
@@ -240,7 +227,7 @@ export default function MyMonstersPage() {
   };
 
   const pendingCount = monsters.filter(
-    (monster) => monster.pendingStats?.totalIv != null
+    (monster) => monster.pendingIv !== null
   ).length;
 
   return (
@@ -418,8 +405,7 @@ export default function MyMonstersPage() {
                           Lv.{monster.level}
                         </span>
 
-                        {monster.pendingStats
-                          ?.totalIv != null && (
+                        {monster.pendingIv !== null && (
                           <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#C84B31] flex items-center justify-center">
                             <Sparkles
                               size={9}
@@ -577,8 +563,7 @@ export default function MyMonstersPage() {
               </div>
 
               {/* 중복 획득으로 새 개체값이 제안된 경우 */}
-              {selected.pendingStats?.totalIv !=
-                null && (
+              {selected.pendingIv !== null && (
                 <div className="bg-[#1A1508] border border-[#4A3D18] rounded-2xl p-3.5">
                   <div className="flex items-center gap-1.5 mb-2.5">
                     <Sparkles
