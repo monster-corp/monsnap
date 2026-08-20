@@ -36,6 +36,22 @@ type UserMonsterItem = {
 };
 
 export default function HomePage() {
+  // NextChargeAt 및 타이머 텍스트 상태 추가
+  const [nextChargeAt, setNextChargeAt] = useState<string | null>(null);
+  const [remainingTimeText, setRemainingTimeText] = useState<string | null>(null);
+
+  // 스캔 충전 정보(남은 시간) 노출 여부 상태
+  const [isChargeInfoOpen, setIsChargeInfoOpen] = useState(false);
+
+  // 버튼 클릭 시 토글 동작 함수
+  const handleScanChargeClick = (e: React.MouseEvent) => {
+    // 충전 시간이 있는 경우(즉, 스캔 횟수가 꽉 차지 않은 경우)에만 토글
+    if (remainingTimeText) {
+      e.preventDefault(); // 필요시 Link 이동을 막고 정보만 토글
+      setIsChargeInfoOpen((prev) => !prev);
+    }
+  };
+
   // error, setError 상태 선언 추가
   const [error, setError] = useState<string | null>(null);
 
@@ -106,6 +122,7 @@ export default function HomePage() {
             setNickname(userData.data?.nickname ?? '새내기 탐험가');
             setScanCharges(userData.data?.scanCharge?.charges ?? 0);
             setMaxScanCharges(userData.data?.scanCharge?.maxCharges ?? 5);
+            setNextChargeAt(userData.data?.scanCharge?.nextChargeAt ?? null);
           }
         } catch (error) {
           console.error('[/api/users] 요청 실패:', error);
@@ -181,6 +198,45 @@ export default function HomePage() {
 
     void fetchLobbyData();
   }, []);
+
+  useEffect(() => {
+    // 이미 풀충전 상태이거나 nextChargeAt 정보가 없으면 타이머 작동 안 함
+    if (!nextChargeAt || scanCharges >= maxScanCharges) {
+      setRemainingTimeText(null);
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const target = new Date(nextChargeAt).getTime();
+      const diff = target - now;
+
+      // 이미 남은 시간이 경과한 경우 (충전 시점 도달)
+      if (diff <= 0) {
+        setRemainingTimeText(null);
+        // 필요하다면 여기서 fetchLobbyData()를 재호출하여 최신 충전 상태를 갱신할 수 있습니다.
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      // 시/분/초 포맷팅 ("2시간 18분 후 +1" 형태)
+      if (hours > 0) {
+        setRemainingTimeText(`${hours}시간 ${minutes}분 후 +1`);
+      } else if (minutes > 0) {
+        setRemainingTimeText(`${minutes}분 ${seconds}초 후 +1`);
+      } else {
+        setRemainingTimeText(`${seconds}초 후 +1`);
+      }
+    };
+
+    updateTimer(); // Initial call
+    const intervalId = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [nextChargeAt, scanCharges, maxScanCharges]);
 
   // 몬스터가 바뀌면 기본 대사
   useEffect(() => {
@@ -555,6 +611,7 @@ export default function HomePage() {
         {/* 스캔 가능 횟수 */}
         <Link
           href="/scans"
+          onClick={handleScanChargeClick}
           className="
             flex
             items-center
@@ -568,7 +625,7 @@ export default function HomePage() {
             border-[#C8BFB5]
             shadow-[0_2px_7px_rgba(45,38,30,0.10)]
             active:scale-95
-            transition-transform
+            transition-all
           "
         >
           <Camera
@@ -576,43 +633,22 @@ export default function HomePage() {
             className="text-[#456A58]"
           />
 
-          <div
-            className="
-              flex
-              flex-col
-              items-start
-              leading-none
-            "
-          >
-            <div
-              className="
-                flex
-                items-center
-                gap-2
-              "
-            >
-              <span
-                className="
-                  text-[11px]
-                  font-bold
-                  text-[#66776E]
-                "
-              >
+          <div className="flex flex-col items-start leading-none gap-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-[#66776E]">
                 스캔 가능
               </span>
-
-              <span
-                className="
-                  text-sm
-                  font-black
-                  text-[#1F4B3C]
-                "
-              >
-                {scanCharges}/
-                {maxScanCharges}
+              <span className="text-sm font-black text-[#1F4B3C]">
+                {scanCharges}/{maxScanCharges}
               </span>
             </div>
 
+            {/* 클릭했고(isChargeInfoOpen), 남은 시간 값이 있을 때만 표시 */}
+            {isChargeInfoOpen && remainingTimeText && (
+              <span className="text-[9px] font-bold text-[#7A8C81] mt-1 transition-opacity">
+                {remainingTimeText}
+              </span>
+            )}
           </div>
         </Link>
       </header>
