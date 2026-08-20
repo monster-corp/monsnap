@@ -17,7 +17,7 @@ const battleSubmitSchema = z.object({
 // -------------------------------------------------------------------
 // 1. GET: 활성화된 보스 정보 조회
 // -------------------------------------------------------------------
-export async function GET({ params }: RouteContext) {
+export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     const userId = await getCurrentUserId();
     if (!userId) {
