@@ -985,6 +985,7 @@ export default function ScansPage() {
                   </div>
                 </div>
 
+                {/* 데모용: 수동 걸음 추가 버튼 제거
                 {isWalking && !isOtherEggWalking && !isReadyToReveal && (
                   <div className="bg-white/70 rounded-2xl p-2 shrink-0 mb-1.5">
                     <div className="flex items-center gap-1.5 mb-1.5 px-1">
@@ -1013,6 +1014,7 @@ export default function ScansPage() {
                     </div>
                   </div>
                 )}
+                */}
 
                 <div className="bg-white/70 rounded-2xl p-2 shrink-0 mb-1.5">
                   <p className="text-[10px] font-bold text-[#4B5A50] mb-1 px-1">
