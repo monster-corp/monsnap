@@ -142,8 +142,7 @@ export async function applyStepsToWalkSession(
             });
 
             return {session: updatedSession, egg: updatedEgg, stepsDelta: diff};
-        },
-        {isolationLevel: Prisma.TransactionIsolationLevel.Serializable}
+        }
     );
 }
 
