@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from '@/lib/api/error-codes';
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 interface BaseStats {
   hp: number;
@@ -81,31 +80,32 @@ export default function CollectionsPage() {
 
   const loadDex = useCallback(async () => {
     setLoading(true);
+    setError(null); // 재시도 및 성공 경로를 위해 초기화
 
     try {
       const res = await fetch('/api/monsters');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(body?.message ?? '도감을 불러오지 못했어요.');
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '몬스터 도감 정보를 불러오지 못했습니다.');
         return;
       }
 
-      const list = body.data?.monsters;
+      const rawList = body?.data?.monsters;
 
-      if (!Array.isArray(list)) {
+      if (!Array.isArray(rawList)) {
         console.error('[도감] 예상하지 못한 응답 구조:', body);
-        setError('도감을 불러오지 못했어요.');
+        setError('올바르지 않은 데이터 형식입니다.');
         return;
       }
 
-      // 정렬은 서버가 처리한다 (lib/monsters.ts: EPIC → RARE → COMMON, 등급 내 dexId 순)
-      setMonsters(list);
-      setTotalCount(body.data?.totalCount ?? 0);
-      setCaughtCount(body.data?.caughtCount ?? 0);
-      setError(null);
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+      setMonsters(rawList);
+      setTotalCount(body.data.totalCount ?? 0);
+      setCaughtCount(body.data.caughtCount ?? 0);
+    } catch (err) {
+      console.error('[/api/monsters] unexpected error:', err);
+      // "Failed to fetch" 원문 노출 방지를 위한 한국어 마스킹
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }

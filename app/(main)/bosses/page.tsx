@@ -10,14 +10,13 @@ import React, {
 import Link from 'next/link';
 import { Menu, Swords, Trophy, X } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from "@/lib/api/error-codes";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 const CRITICAL_RATE = 0.2;
 const CRITICAL_MULTIPLIER = 1.5;
@@ -350,83 +349,45 @@ export default function BossPage() {
     try {
       const [bossRes, monstersRes] = await Promise.all([
         fetch(`/api/bosses/${BOSS_ID}`),
-        fetch(
-          '/api/user-monsters?sort=dexId&order=asc'
-        ),
+        fetch('/api/user-monsters?sort=dexId&order=asc'),
       ]);
 
-      const bossBody = await bossRes
-        .json()
-        .catch(() => null);
+      const bossBody = await bossRes.json().catch(() => null);
+      const monstersBody = await monstersRes.json().catch(() => null);
 
-      const monstersBody = await monstersRes
-        .json()
-        .catch(() => null);
-
-      // ----------------------------------------------------------
-      // 보스 데이터
-      // ----------------------------------------------------------
-
-      if (
-        bossRes.ok &&
-        bossBody?.code === CODE_OK &&
-        bossBody?.data
-      ) {
-        const data = bossBody.data as BossApiData;
-
-        const loadedBoss: BossState = {
-          ...data,
-          dexId: data.dexId ?? Number(BOSS_ID),
-          maxHp: data.hp,
-          currentHp: data.hp,
-          bgImageUrl: data.bgImageUrl || null,
-        };
-
-        setBoss(loadedBoss);
-
-        setRemainingMs(data.timeLimitMs);
-      } else {
-        throw new Error(
-          bossBody?.message ??
-            '보스 정보를 불러오지 못했어요.'
-        );
+      if (!bossRes.ok || bossBody?.code !== ERROR.OK.code) {
+        setLoadError(bossBody?.message ?? ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
-      // ----------------------------------------------------------
-      // 유저 몬스터 데이터
-      // ----------------------------------------------------------
+      const data = bossBody.data as BossApiData;
+      const loadedBoss: BossState = {
+        ...data,
+        dexId: data.dexId ?? Number(BOSS_ID),
+        maxHp: data.hp,
+        currentHp: data.hp,
+        bgImageUrl: data.bgImageUrl || null,
+      };
+      setBoss(loadedBoss);
+      setRemainingMs(data.timeLimitMs);
 
-      if (
-        !monstersRes.ok ||
-        monstersBody?.code !== CODE_OK
-      ) {
-        throw new Error(
-          monstersBody?.message ??
-            '보유 몬스터를 불러오지 못했어요.'
-        );
+      if (!monstersRes.ok || monstersBody?.code !== ERROR.OK.code) {
+        setLoadError(monstersBody?.message ?? ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
-      const list =
-        monstersBody.data?.userMonsters;
+      const list = monstersBody.data?.userMonsters;
 
       if (!Array.isArray(list)) {
-        throw new Error(
-          '보유 몬스터 응답 형식이 올바르지 않습니다.'
-        );
+        console.error('[보스전] 예상하지 못한 몬스터 응답 구조:', monstersBody);
+        setLoadError(ERROR.INTERNAL_ERROR.message);
+        return;
       }
 
       setMyMonsters(list);
     } catch (error) {
-      console.error(
-        '[보스전] 초기 데이터 조회 실패:',
-        error
-      );
-
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : '전투 정보를 불러오지 못했어요.'
-      );
+      console.error('[보스전] 데이터 로딩 실패:', error);
+      setLoadError(ERROR.INTERNAL_ERROR.message);
     } finally {
       setIsLoading(false);
     }
@@ -463,88 +424,44 @@ export default function BossPage() {
 
   const submitBattleResult = useCallback(
     async (payload: BattleSubmitPayload) => {
-      if (!boss || submittingRef.current) {
-        return;
-      }
+      if (!boss || submittingRef.current) return;
 
       submittingRef.current = true;
-
       battleEndedRef.current = true;
-
       setIsBattleEnded(true);
-
       setResultState('submitting');
-
       setResultError(null);
-
       lastSubmitPayloadRef.current = payload;
 
       try {
-        const res = await fetch(
-          `/api/bosses/${boss.dexId}`,
-          {
-            method: 'POST',
+        const res = await fetch(`/api/bosses/${boss.dexId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json().catch(() => null);
 
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-
-            body: JSON.stringify(payload),
-          }
-        );
-
-        const body = await res
-          .json()
-          .catch(() => null);
-
-        if (
-          !res.ok ||
-          body?.code !== CODE_OK ||
-          !body?.data
-        ) {
-          throw new Error(
-            body?.message ??
-              '전투 결과를 확인하지 못했어요.'
-          );
+        if (!res.ok || body?.code !== ERROR.OK.code || !body?.data) {
+          setResultError(body?.message ?? ERROR.INTERNAL_ERROR.message);
+          setResultState('error');
+          setShowNavigation(true);
+          return;
         }
 
-        const result =
-          body.data as BattleResult;
-
+        const result = body.data as BattleResult;
         setBattleResult(result);
-
-        setResultState(
-          result.isCleared
-            ? 'victory'
-            : 'failure'
-        );
-
+        setResultState(result.isCleared ? 'victory' : 'failure');
         setShowNavigation(true);
       } catch (error) {
-        console.error(
-          '[보스전] 결과 저장 실패:',
-          error
-        );
-
-        setResultError(
-          error instanceof Error
-            ? error.message
-            : '전투 결과 저장에 실패했어요.'
-        );
-
+        console.error('[보스전] 결과 전송 실패:', error);
+        setResultError(ERROR.INTERNAL_ERROR.message);
         setResultState('error');
-
         setShowNavigation(true);
       } finally {
         submittingRef.current = false;
       }
     },
-    [
-      boss,
-      getDamageMultiplier,
-      selectedMonster,
-    ]
+    [boss]
   );
 
   // ==============================================================

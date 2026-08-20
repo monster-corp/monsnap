@@ -5,7 +5,7 @@ import { ApiError, respondWithStatus } from "@/lib/api/response";
 import { parseBigIntParam } from "@/lib/api/params";
 import { getActiveBossByDexId, processBossBattle } from "@/lib/bosses";
 
-type RouteContext = { params: Promise<{ bossId: string }> };
+type RouteContext = { params: Promise<{ dexId: string }> };
 
 const battleSubmitSchema = z.object({
   userMonsterId: z.union([z.string(), z.number()]),
@@ -17,27 +17,27 @@ const battleSubmitSchema = z.object({
 // -------------------------------------------------------------------
 // 1. GET: 활성화된 보스 정보 조회
 // -------------------------------------------------------------------
-export async function GET(req: NextRequest, { params }: RouteContext) {
+export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     const userId = await getCurrentUserId();
     if (!userId) {
       return respondWithStatus("UNAUTHORIZED");
     }
 
-    const { bossId } = await params;
-    const parsedBossId = parseBigIntParam(bossId);
-    if (parsedBossId === null) {
+    const { dexId } = await params;
+    const parsedBossDexId = parseBigIntParam(dexId);
+    if (parsedBossDexId === null) {
       return respondWithStatus("INVALID_REQUEST");
     }
 
     // dexId 기준 보스 조회 (보스가 없으면 getActiveBossByDexId 내부에서 BossNotFoundError를 던짐)
-    const bossData = await getActiveBossByDexId(Number(parsedBossId));
+    const bossData = await getActiveBossByDexId(Number(parsedBossDexId));
     return respondWithStatus("OK", bossData);
   } catch (err) {
     if (err instanceof ApiError) {
       return respondWithStatus(err.key, null, err.message);
     }
-    console.error("[/api/bosses/[bossId] GET] unexpected error:", err);
+    console.error("[/api/bosses/[dexId] GET] unexpected error:", err);
     return respondWithStatus("INTERNAL_ERROR");
   }
 }
@@ -52,9 +52,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return respondWithStatus("UNAUTHORIZED");
     }
 
-    const { bossId } = await params;
-    const parsedBossId = parseBigIntParam(bossId);
-    if (parsedBossId === null) {
+    const { dexId } = await params;
+    const parsedBossDexId = parseBigIntParam(dexId);
+    if (parsedBossDexId === null) {
       return respondWithStatus("INVALID_REQUEST");
     }
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
 
     // 1. URL의 dexId로 보스 정보(PK id 포함) 조회
-    const bossData = await getActiveBossByDexId(Number(parsedBossId));
+    const bossData = await getActiveBossByDexId(Number(parsedBossDexId));
 
     // 2. bossData.id(string)를 BigInt로 올바르게 변환 (BigInt(bossData.id) 활용)
     const realBossPk = BigInt(bossData.id);
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (err instanceof ApiError) {
       return respondWithStatus(err.key, null, err.message);
     }
-    console.error("[/api/bosses/[bossId] POST] unexpected error:", err);
+    console.error("[/api/bosses/[dexId] POST] unexpected error:", err);
     return respondWithStatus("INTERNAL_ERROR");
   }
 }

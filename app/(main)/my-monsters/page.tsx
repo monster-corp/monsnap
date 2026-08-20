@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from '@/lib/api/error-codes';
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 // 서버가 지원하는 정렬 기준 (lib/user-monsters.ts의 SORT_FIELDS)
 const SORT_OPTIONS = [
@@ -121,9 +120,7 @@ function MonsterSilhouette({
 
 export default function MyMonstersPage() {
   const [monsters, setMonsters] = useState<UserMonster[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    null
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('dexId');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -140,12 +137,15 @@ export default function MyMonstersPage() {
     ) ?? null;
 
   // 정렬은 서버가 처리한다 (lib/user-monsters.ts)
+
+  // loadMonsters 데이터 추출 유연화
   const loadMonsters = useCallback(async () => {
     const option =
       SORT_OPTIONS.find((item) => item.key === sortKey) ??
       SORT_OPTIONS[0];
 
     setLoading(true);
+    setError(null);
 
     try {
       const res = await fetch(
@@ -154,29 +154,23 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(
-          body?.message ??
-            '보유 몬스터를 불러오지 못했어요.'
-        );
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '보유한 몬스터 정보를 불러오지 못했습니다.');
         return;
       }
 
-      const list = body.data?.userMonsters;
+      const rawList = body?.data?.userMonsters;
 
-      if (!Array.isArray(list)) {
-        console.error(
-          '[내 몬스터] 예상하지 못한 응답 구조:',
-          body
-        );
-        setError('보유 몬스터를 불러오지 못했어요.');
+      if (!Array.isArray(rawList)) {
+        console.error('[내 몬스터] 예상하지 못한 응답 구조:', body);
+        setError('보유한 몬스터 정보를 불러오지 못했습니다.');
         return;
       }
 
-      setMonsters(list);
-      setError(null);
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+      setMonsters(rawList);
+    } catch (err) {
+      console.error('[/api/user-monsters] unexpected error:', err);
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
@@ -186,10 +180,7 @@ export default function MyMonstersPage() {
     void loadMonsters();
   }, [loadMonsters]);
 
-  /**
-   * 같은 몬스터를 다시 잡으면 새 개체값이 제안된다.
-   * accept면 제안값으로 교체하고, reject면 기존 값을 유지한다.
-   */
+  // handleIvDecision 성공 조건 수정
   const handleIvDecision = async (
     userMonsterId: string,
     decision: 'accept' | 'reject'
@@ -213,16 +204,15 @@ export default function MyMonstersPage() {
 
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(
-          body?.message ?? '개체값 처리에 실패했어요.'
-        );
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '개체값 판정 처리에 실패했습니다.');
         return;
       }
 
       await loadMonsters();
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+    } catch (err) {
+      console.error(`[/api/user-monsters/${userMonsterId}/iv] error:`, err);
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(false);
     }
@@ -237,7 +227,7 @@ export default function MyMonstersPage() {
   };
 
   const pendingCount = monsters.filter(
-    (monster) => monster.pendingStats?.totalIv != null
+    (monster) => monster.pendingIv !== null
   ).length;
 
   return (
@@ -415,8 +405,7 @@ export default function MyMonstersPage() {
                           Lv.{monster.level}
                         </span>
 
-                        {monster.pendingStats
-                          ?.totalIv != null && (
+                        {monster.pendingIv !== null && (
                           <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#C84B31] flex items-center justify-center">
                             <Sparkles
                               size={9}
@@ -574,8 +563,7 @@ export default function MyMonstersPage() {
               </div>
 
               {/* 중복 획득으로 새 개체값이 제안된 경우 */}
-              {selected.pendingStats?.totalIv !=
-                null && (
+              {selected.pendingIv !== null && (
                 <div className="bg-[#1A1508] border border-[#4A3D18] rounded-2xl p-3.5">
                   <div className="flex items-center gap-1.5 mb-2.5">
                     <Sparkles

@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from "@/lib/api/error-codes";
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '700', '900'],
@@ -20,7 +21,6 @@ const notoSans = Noto_Sans_KR({
 });
 
 const SCANS_PATH = '/scans';
-const CODE_OK = 20000;
 const AUTO_SLIDE_MS = 3000;
 
 const SCREEN_FRAME =
@@ -234,58 +234,41 @@ export default function OnboardingClient() {
     !submitting &&
     !isComposing;
 
-  const handleSubmit =
-    async () => {
-      if (!canSubmit) {
+  const handleSubmit = async () => {
+    if (!canSubmit) {
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nickname: normalizedNickname,
+        }),
+      });
+
+      const body = await res.json().catch(() => null);
+
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setSubmitError(body?.message ?? ERROR.INTERNAL_ERROR.message);
+        setSubmitting(false);
         return;
       }
 
-      setSubmitting(true);
-      setSubmitError(null);
-
-      try {
-        const res = await fetch(
-          '/api/users',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              nickname:
-                normalizedNickname,
-            }),
-          }
-        );
-
-        const body = await res
-          .json()
-          .catch(() => null);
-
-        if (
-          !res.ok ||
-          body?.code !== CODE_OK
-        ) {
-          setSubmitError(
-            body?.message ??
-              '닉네임 등록에 실패했어요. 다시 시도해주세요.'
-          );
-
-          setSubmitting(false);
-          return;
-        }
-
-        router.push(SCANS_PATH);
-        router.refresh();
-      } catch {
-        setSubmitError(
-          '네트워크 오류가 발생했어요. 다시 시도해주세요.'
-        );
-
-        setSubmitting(false);
-      }
-    };
+      router.push(SCANS_PATH);
+      router.refresh();
+    } catch (error) {
+      console.error('[/api/users] 요청 실패:', error);
+      setSubmitError(ERROR.INTERNAL_ERROR.message);
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div

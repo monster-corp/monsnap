@@ -13,14 +13,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Noto_Sans_KR } from 'next/font/google';
+import { ERROR } from '@/lib/api/error-codes';
 
 const notoSans = Noto_Sans_KR({
   weight: ['400', '500', '700', '900'],
   display: 'swap',
   preload: false,
 });
-
-const CODE_OK = 20000;
 
 type Tab = 'daily' | 'weekly';
 
@@ -234,28 +233,29 @@ export default function MissionsPage() {
 
   const loadMissions = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(null); // 재시도 및 성공 경로를 위해 초기화
 
     try {
       const res = await fetch('/api/missions');
       const body = await res.json().catch(() => null);
 
-      if (!res.ok || body?.code !== CODE_OK) {
-        setError(body?.message ?? '미션을 불러오지 못했어요.');
+      if (!res.ok || body?.code !== ERROR.OK.code) {
+        setError(body?.message ?? '미션 정보를 불러오지 못했습니다.');
         return;
       }
 
       const list = body.data?.missions;
 
       if (!Array.isArray(list)) {
-        console.error('[미션] 예상하지 못한 응답 구조:', body);
-        setError('미션을 불러오지 못했어요.');
+        setError('올바르지 않은 데이터 형식입니다.');
         return;
       }
 
       setMissions(list);
-    } catch {
-      setError('네트워크 오류가 발생했어요.');
+    } catch (err) {
+      console.error('[/api/missions] unexpected error:', err);
+      // "Failed to fetch" 등 영문 원문 노출 방지를 위한 마스킹
+      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }

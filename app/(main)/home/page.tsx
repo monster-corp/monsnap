@@ -14,8 +14,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ERROR } from "@/lib/api/error-codes";
 
-const CODE_OK = 20000;
 const SWIPE_THRESHOLD = 45;
 
 // 상단 종이 영역 높이
@@ -36,6 +36,9 @@ type UserMonsterItem = {
 };
 
 export default function HomePage() {
+  // error, setError 상태 선언 추가
+  const [error, setError] = useState<string | null>(null);
+
   // /api/users 연동 전/실패 시 fallback
   const [nickname, setNickname] =
     useState('새내기 탐험가');
@@ -81,153 +84,95 @@ export default function HomePage() {
   // ─────────────────────
   useEffect(() => {
     async function fetchLobbyData() {
+
+      // 요청 시작 시 기존 에러 상태 초기화 (재시도 케이스 대응)
+      setError(null);
+
       try {
         // ─────────────────────
         // 1. 현재 사용자 정보
-        // nickname + scanCharge
         // ─────────────────────
         try {
-          const userRes = await fetch(
-            '/api/users'
-          );
+          const userRes = await fetch('/api/users');
+          const userData = await userRes.json().catch(() => null);
 
-          const userData = await userRes
-            .json()
-            .catch(() => null);
-
-          if (
-            userRes.ok &&
-            userData?.code === CODE_OK
-          ) {
-            setNickname(
-              userData.data?.nickname ??
-                '새내기 탐험가'
-            );
-
-            setScanCharges(
-              userData.data?.scanCharge
-                ?.charges ?? 0
-            );
-
-            setMaxScanCharges(
-              userData.data?.scanCharge
-                ?.maxCharges ?? 5
-            );
-
+          if (!userRes.ok || userData?.code !== ERROR.OK.code) {
+            if (userData?.message) {
+              setError(userData.message);
+              return;
+            }
+            console.error('[/api/users] 요청 실패:', userData);
           } else {
-            console.error(
-              '[홈] 사용자 정보 조회 실패:',
-              userData
-            );
+            setNickname(userData.data?.nickname ?? '새내기 탐험가');
+            setScanCharges(userData.data?.scanCharge?.charges ?? 0);
+            setMaxScanCharges(userData.data?.scanCharge?.maxCharges ?? 5);
           }
         } catch (error) {
-          console.error(
-            '[홈] 사용자 정보 조회 실패:',
-            error
-          );
+          console.error('[/api/users] 요청 실패:', error);
         }
 
         // ─────────────────────
         // 2. 보유 몬스터 전체 조회
         // ─────────────────────
         try {
-          const monsterRes = await fetch(
-            '/api/user-monsters?sort=dexId&order=asc'
-          );
+          const monsterRes = await fetch('/api/user-monsters?sort=dexId&order=asc');
+          const monsterData = await monsterRes.json().catch(() => null);
 
-          const monsterData =
-            await monsterRes
-              .json()
-              .catch(() => null);
-
-          if (
-            !monsterRes.ok ||
-            monsterData?.code !== CODE_OK
-          ) {
-            console.error(
-              '[홈] 보유 몬스터 조회 실패:',
-              monsterData
-            );
-
+          if (!monsterRes.ok || monsterData?.code !== ERROR.OK.code) {
+            if (monsterData?.message) {
+              setError(monsterData.message);
+              return;
+            }
             setMonsterLoadError(true);
             setMonsters([]);
-            setSpeechText(
-              '몬스터 정보를 불러오지 못했어요.'
-            );
+            setSpeechText('몬스터 정보를 불러오지 못했어요.');
             return;
           }
 
-          const list =
-            monsterData.data?.userMonsters;
+          const list = monsterData.data?.userMonsters;
 
           if (!Array.isArray(list)) {
-            console.error(
-              '[홈] 예상하지 못한 몬스터 응답 구조:',
-              monsterData
-            );
-
+            console.error('[/api/user-monsters] 예상하지 못한 응답 구조:', monsterData);
             setMonsterLoadError(true);
             setMonsters([]);
-            setSpeechText(
-              '몬스터 정보를 불러오지 못했어요.'
-            );
+            setSpeechText('몬스터 정보를 불러오지 못했어요.');
             return;
           }
 
           if (list.length === 0) {
             setMonsterLoadError(false);
             setMonsters([]);
-            setSpeechText(
-              '주변 사물을 찍어 첫 친구를 찾아볼까요?'
-            );
-            return;
-          }
+            setSpeechText('주변 사물을 찍어 첫 친구를 찾아볼까요?');
+          } else {
+            const parsedMonsters: Monster[] = (list as UserMonsterItem[]).map((item) => {
+              let imageUrl = item.imageUrl;
 
-          const parsedMonsters: Monster[] =
-            (list as UserMonsterItem[]).map(
-              (item) => {
-                let imageUrl = item.imageUrl;
-
-                if (
-                  imageUrl &&
-                  !imageUrl.startsWith(
-                    'http'
-                  ) &&
-                  !imageUrl.startsWith(
-                    '/'
-                  )
-                ) {
-                  imageUrl = `/${imageUrl}`;
-                }
-
-                return {
-                  id: item.userMonsterId,
-                  name: item.name,
-                  rarity: item.rarity,
-                  imageUrl,
-                };
+              if (
+                imageUrl &&
+                !imageUrl.startsWith('http') &&
+                !imageUrl.startsWith('/')
+              ) {
+                imageUrl = `/${imageUrl}`;
               }
-            );
 
-          setMonsterLoadError(false);
-          setMonsters(parsedMonsters);
-          setActiveMonsterIndex(0);
+              return {
+                id: item.userMonsterId,
+                name: item.name,
+                rarity: item.rarity,
+                imageUrl,
+              };
+            });
 
-          setSpeechText(
-            '오늘도 같이 탐험해볼까요?'
-          );
+            setMonsterLoadError(false);
+            setMonsters(parsedMonsters);
+            setActiveMonsterIndex(0);
+            setSpeechText('오늘도 같이 탐험해볼까요?');
+          }
         } catch (error) {
-          console.error(
-            '[홈] 보유 몬스터 조회 실패:',
-            error
-          );
-
+          console.error('[/api/user-monsters] 요청 실패:', error);
           setMonsterLoadError(true);
           setMonsters([]);
-
-          setSpeechText(
-            '몬스터 정보를 불러오지 못했어요.'
-          );
+          setSpeechText('몬스터 정보를 불러오지 못했어요.');
         }
       } finally {
         setLoading(false);
@@ -240,9 +185,7 @@ export default function HomePage() {
   // 몬스터가 바뀌면 기본 대사
   useEffect(() => {
     if (monsters.length > 0) {
-      setSpeechText(
-        '오늘도 같이 탐험해볼까요?'
-      );
+      setSpeechText('오늘도 같이 탐험해볼까요?');
     }
   }, [
     activeMonsterIndex,
