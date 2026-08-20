@@ -645,7 +645,7 @@ export default function HomePage() {
 
             {/* 클릭했고(isChargeInfoOpen), 남은 시간 값이 있을 때만 표시 */}
             {isChargeInfoOpen && remainingTimeText && (
-              <span className="text-[9px] font-bold text-[#7A8C81] mt-1 transition-opacity">
+              <span className="text-[9px] font-bold text-blue-500 mt-1 transition-opacity">
                 {remainingTimeText}
               </span>
             )}
