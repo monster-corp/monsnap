@@ -1,0 +1,91 @@
+import {openai} from "@ai-sdk/openai";
+import {generateText, NoOutputGeneratedError, Output} from "ai";
+import {type VlmResponse, vlmResponseSchema} from "@/lib/schemas/vlm";
+import {VlmCallError, VlmResponseInvalidError, VlmTimeoutError} from "@/lib/errors/vlm";
+
+const VLM_TIMEOUT_MS = 15_000;
+
+const VLM_PROMPT = `
+너는 사물 이미지를 분석하는 분석기다. 사진 속 사물의 재질(material)과 형태(shape)를 판단해라.
+
+material은 다음 중 하나여야 한다: NORMAL, FIRE, WATER, GRASS, METAL, CERAMIC, GLASS, PLASTIC, ELECTRIC
+shape는 다음 중 하나여야 한다: FREEFORM, ROUND, TRIANGLE, SQUARE, LONG
+1. ROUND: 가로세로 비율이 1:1에 가깝고 모서리가 둥근 형태 (공, 병뚜껑, 원반 등)
+2. SQUARE: 가로세로 비율이 1:1에 가깝고 모서리가 각진 형태 (상자, 큐브, 책 등)
+3. TRIANGLE: 삼각형에 가까운 뾰족한 형태 (피라미드, 원뿔, 삼각자 등)
+4. LONG: 가로세로 비율이 2:1 이상으로, 한쪽 축이 뚜렷하게 긴 막대형. 휘어있어도 전체 윤곽이 길쭉하면 해당 (연필, 빨대, 케이블 등)
+5. FREEFORM: 위 네 가지 중 어디에도 뚜렷하게 속하지 않는 불규칙한 형태
+
+재질이 여러 개 섞여 있으면 가장 넓은 면적을 차지하는 재질 하나를 선택해라.
+confidence는 0~100 사이의 정수부와 소수점 이하 2자리로 표현하여 판단에 대한 확신도를 나타낸다.
+사진에 사람의 얼굴이나 신체가 주된 피사체로 나오면 block_reason을 "FACE"로 설정해라.
+사진이 모니터, TV, 스마트폰 화면 등 다른 화면을 촬영한 것이거나, 인쇄된 사진을 재촬영한 것으로 보이면 block_reason을 "SCREEN"으로 설정해라.
+둘 다 해당하면 얼굴을 우선해 "FACE"로 설정해라.
+둘 다 해당하지 않으면 block_reason을 "NONE"으로 설정해라.
+`;
+
+export async function callVlm(image: File): Promise<VlmResponse> {
+    const base64 = await fileToBase64(image);
+
+    // 모바일 환경에서 타입을 비워둔 상태로 보낼 수 있음
+    const mediaType = image.type || "image/jpeg";
+    const started = performance.now();
+
+    let output: unknown;
+    try {
+        const result = await withTimeout(
+            generateText({
+                model: openai("gpt-5-mini"),
+                output: Output.object({schema: vlmResponseSchema}),
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            {type: "text", text: VLM_PROMPT},
+                            {type: "file", mediaType, data: base64},
+                        ],
+                    },
+                ],
+            }),
+            VLM_TIMEOUT_MS
+        );
+        output = result.output;
+    } catch (err) {
+        console.info(`[callVlm] 실패, ${(performance.now() - started).toFixed(0)}ms 경과`);
+        if (err instanceof TimeoutError) {
+            throw new VlmTimeoutError();
+        }
+        if (NoOutputGeneratedError.isInstance(err)) {
+            throw new VlmResponseInvalidError(err);
+        }
+        console.error("[callVlm] VLM 호출 실패:", err);
+        throw new VlmCallError(err);
+    } finally {
+        console.info(`[callVlm] ${(performance.now() - started).toFixed(0)}ms`);
+    }
+
+    // AI SDK의 구조화 출력 이후에도 방어적으로 Zod 검증을 한 번 더 수행
+    const parsed = vlmResponseSchema.safeParse(output);
+    if (!parsed.success) {
+        throw new VlmResponseInvalidError(parsed.error);
+    }
+
+    return parsed.data;
+}
+
+async function fileToBase64(file: File): Promise<string> {
+    const buffer = await file.arrayBuffer();
+    return Buffer.from(buffer).toString("base64");
+}
+
+class TimeoutError extends Error {
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new TimeoutError()), ms)
+        ),
+    ]);
+}

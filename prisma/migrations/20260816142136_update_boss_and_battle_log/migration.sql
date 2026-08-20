@@ -1,0 +1,11 @@
+-- AlterTable
+ALTER TABLE "battle_logs" DROP COLUMN "is_critical",
+ADD COLUMN     "battle_type" VARCHAR(30) NOT NULL DEFAULT 'BOSS_TIMED',
+ADD COLUMN     "critical_count" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "elapsed_ms" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "is_cleared" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "touch_count" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "bosses" ADD COLUMN     "time_limit_ms" INTEGER;
